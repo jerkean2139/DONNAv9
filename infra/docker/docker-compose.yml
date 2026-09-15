@@ -1,0 +1,25 @@
+# Local development infrastructure for DONNA V2.
+# Authoritative relational state + the pgvector index live in one Postgres
+# for local dev (Technical Plan §1.4/§12). This is LOCAL only — never a
+# production topology. Bring up with: docker compose -f infra/docker/docker-compose.yml up -d
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: donna-postgres
+    environment:
+      POSTGRES_USER: donna
+      POSTGRES_PASSWORD: donna
+      POSTGRES_DB: donna
+    ports:
+      - '5432:5432'
+    volumes:
+      - donna-pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U donna -d donna']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  donna-pgdata:
