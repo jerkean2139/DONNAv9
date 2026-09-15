@@ -1,4 +1,4 @@
-import type { ModelAdapter, ModelRequest } from '@donna/adapter-base';
+import type { CapabilityAdapter, ModelAdapter, ModelRequest } from '@donna/adapter-base';
 import type { ModelEntry } from '@donna/config';
 import type { Budget, UsageLedger } from '@donna/cost-governor';
 import type { Actor, ExecutionClass } from '@donna/core-domain';
@@ -28,6 +28,9 @@ export interface WorkOrder {
   readonly requireLocal?: boolean;
   readonly minContextTokens?: number;
   readonly modelRequest?: ModelRequest;
+
+  /** Payload handed to a non-AI capability adapter's `execute` (§7.4). */
+  readonly capabilityInput?: unknown;
 
   /** Deterministic policy gate (Technical Plan §6). */
   readonly policy?: {
@@ -62,6 +65,8 @@ export interface WorkOrderResult {
   readonly modelId?: string;
   readonly capabilityId?: string;
   readonly text?: string;
+  /** Result returned by a non-AI capability adapter. */
+  readonly output?: unknown;
   readonly reason?: string;
 }
 
@@ -72,4 +77,9 @@ export interface OrchestratorDeps {
   readonly ledger: UsageLedger;
   /** Resolve a bound ModelAdapter for a model id (composition root wires vendors). */
   readonly resolveModelAdapter: (modelId: string) => ModelAdapter | undefined;
+  /**
+   * Resolve a bound non-AI capability adapter for a Work-Router capability id.
+   * Optional: when absent, non-AI classes park as `blocked` (no adapter wired).
+   */
+  readonly resolveCapabilityAdapter?: (capabilityId: string) => CapabilityAdapter | undefined;
 }

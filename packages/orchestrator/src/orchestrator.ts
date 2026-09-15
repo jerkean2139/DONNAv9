@@ -75,16 +75,72 @@ export async function executeWorkOrder(
     return { status: 'awaiting_human', executionClass: 'human', reason: routing.reason };
   }
 
-  // 3a. Non-AI capability classes are dispatched by the orchestrator's capability
-  //     adapters (wired in a later increment); for now they park as blocked.
+  // 3a. Non-AI capability classes run through a bound capability adapter
+  //     (deterministic/automation/…). If none is wired for the matched
+  //     capability, the work parks as blocked rather than falling to an LLM.
   if (!isAiExecutionClass(routing.executionClass)) {
-    await emit('task.blocked');
-    return {
-      status: 'blocked',
-      executionClass: routing.executionClass,
-      reason: 'no_capability_adapter',
-      ...(routing.capabilityId !== undefined ? { capabilityId: routing.capabilityId } : {}),
-    };
+    const capabilityId = routing.capabilityId;
+    const adapter =
+      capabilityId !== undefined ? deps.resolveCapabilityAdapter?.(capabilityId) : undefined;
+    if (adapter === undefined) {
+      await emit('task.blocked');
+      return {
+        status: 'blocked',
+        executionClass: routing.executionClass,
+        reason: 'no_capability_adapter',
+        ...(capabilityId !== undefined ? { capabilityId } : {}),
+      };
+    }
+
+    const ctx = order.correlationId !== undefined ? { correlationId: order.correlationId } : {};
+
+    if (order.budget !== undefined) {
+      const est = await adapter.estimate(order.capabilityInput, ctx);
+      const check = checkBudget(order.budget.budget, order.budget.spentUsd, est.costUsd);
+      if (!check.allowed) {
+        await emit('task.blocked');
+        return {
+          status: 'budget_exceeded',
+          executionClass: routing.executionClass,
+          ...(capabilityId !== undefined ? { capabilityId } : {}),
+        };
+      }
+    }
+
+    await emit('worker.started');
+    await emit('tool.called');
+    try {
+      const output = await adapter.execute(order.capabilityInput, ctx);
+      const usage = adapter.reportUsage();
+      // Capability spend lands in the same ledger, keyed by capability id (no
+      // tokens — deterministic/automation work is not model-metered).
+      deps.ledger.record({
+        modelId: capabilityId ?? adapter.id,
+        provider: 'capability',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: usage?.costUsd ?? 0,
+        latencyMs: usage?.latencyMs ?? 0,
+        ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
+      });
+      await emit('task.completed');
+      return {
+        status: 'completed',
+        executionClass: routing.executionClass,
+        output,
+        ...(capabilityId !== undefined ? { capabilityId } : {}),
+      };
+    } catch {
+      // Capability failures do not fall back to another class here; the
+      // orchestrator's cross-class fallback chain is a later increment.
+      await emit('task.failed');
+      return {
+        status: 'failed',
+        executionClass: routing.executionClass,
+        reason: 'adapter_error',
+        ...(capabilityId !== undefined ? { capabilityId } : {}),
+      };
+    }
   }
 
   // 3b. AI class → Model Router picks the model/node, then the adapter runs it.
