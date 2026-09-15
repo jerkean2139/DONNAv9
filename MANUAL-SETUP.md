@@ -86,6 +86,58 @@ orders can't execute (they resolve to no adapter).
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
+Anthropic is the primary provider and the only one required for AI work. OpenAI
+(§2a) and a local model (§2b) are **optional** additional providers — the Model
+Router uses them for fallback and privacy-constrained routing. Any provider you
+don't configure simply stays unavailable; nothing breaks.
+
+### 2a. OpenAI (optional) — `OPENAI_API_KEY`
+
+**What:** enables the OpenAI model adapter. Only wired when the key is set;
+absent → the provider stays unavailable (no crash).
+
+**Where:** <https://platform.openai.com/api-keys>.
+
+| Variable          | Required?  | What it is                                       |
+| ----------------- | ---------- | ------------------------------------------------ |
+| `OPENAI_API_KEY`  | for OpenAI | OpenAI API key (Bearer)                          |
+| `OPENAI_BASE_URL` | optional   | Override endpoint for an OpenAI-compatible proxy |
+
+**Local PowerShell:**
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+$env:OPENAI_BASE_URL = "https://your-proxy/v1"   # optional
+```
+
+### 2b. Local model (optional) — `LOCAL_MODEL_BASE_URL`
+
+**What:** enables the local (self-hosted) model adapter for a model running
+behind an **OpenAI-compatible** server on your own hardware (the Dell/Omen box) —
+Ollama, vLLM, or LM Studio. Used for `requireLocal` / privacy-sensitive work.
+Only wired when the endpoint is set.
+
+**Where:** the URL your local server exposes, e.g. Ollama's
+`http://127.0.0.1:11434/v1`. Most local servers ignore the API key, so
+`LOCAL_MODEL_API_KEY` is optional (it defaults to a harmless placeholder).
+
+| Variable               | Required? | What it is                            |
+| ---------------------- | --------- | ------------------------------------- |
+| `LOCAL_MODEL_BASE_URL` | for local | Local OpenAI-compatible endpoint URL  |
+| `LOCAL_MODEL_API_KEY`  | optional  | Key if your local server enforces one |
+
+**Local PowerShell:**
+
+```powershell
+$env:LOCAL_MODEL_BASE_URL = "http://127.0.0.1:11434/v1"
+$env:LOCAL_MODEL_API_KEY = "not-needed"   # optional
+```
+
+> The model ids/pricing for OpenAI and local entries in the registry are still
+> placeholders (`available: false`) pending your confirmation of the exact model
+> pool — see `packages/config/src/models.ts`. Set those before relying on either
+> provider in routing.
+
 ---
 
 ## 3. Production auth (Clerk) — JWT verification
@@ -200,7 +252,8 @@ service → **Variables**, set the variables that service needs:
 - **control-plane:** `DATABASE_URL`, `AUTH_JWKS_URL` (+ the other `AUTH_*`),
   `CLERK_WEBHOOK_SECRET`, `PORT` (optional — defaults to `3000`).
 - **worker:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GHL_TOKEN`
-  (+ `GHL_LOCATION_ID` if used).
+  (+ `GHL_LOCATION_ID` if used), and optionally `OPENAI_API_KEY` /
+  `LOCAL_MODEL_BASE_URL` to enable those providers.
 
 `PORT` (control-plane only) is optional:
 
@@ -219,6 +272,10 @@ project; the rest you paste in from the provider dashboards above.
 | ---------------------- | ------------- | ----------------------- | --------------------------------------------- |
 | `DATABASE_URL`         | both          | for durability          | Railway Postgres                              |
 | `ANTHROPIC_API_KEY`    | worker        | for AI                  | console.anthropic.com                         |
+| `OPENAI_API_KEY`       | worker        | optional (OpenAI)       | platform.openai.com/api-keys                  |
+| `OPENAI_BASE_URL`      | worker        | optional                | OpenAI-compatible proxy URL                   |
+| `LOCAL_MODEL_BASE_URL` | worker        | optional (local model)  | your local server, e.g. Ollama `/v1`          |
+| `LOCAL_MODEL_API_KEY`  | worker        | optional                | only if your local server enforces one        |
 | `AUTH_JWKS_URL`        | control-plane | for prod auth           | Clerk Frontend API + `/.well-known/jwks.json` |
 | `AUTH_ISSUER`          | control-plane | recommended             | Clerk Frontend API URL                        |
 | `AUTH_AUDIENCE`        | control-plane | optional                | your API audience                             |
@@ -237,9 +294,10 @@ project; the rest you paste in from the provider dashboards above.
 Router, Model Router, orchestrator, durable-queue worker, transactional outbox,
 control-plane API + enqueue path, DB-backed persistence, tenant-scoped reads,
 integration test harness (now runs against live Postgres in CI), capability
-adapter contract, SSRF-safe HTTP adapter, Anthropic model adapter, Clerk JWT
-verification + provisioning webhook, GoHighLevel CRM adapter (wired into the
-worker).
+adapter contract, SSRF-safe HTTP adapter, Anthropic + OpenAI + local model
+adapters (all wired into the worker's resolver), cross-class capability fallback,
+Clerk JWT verification + provisioning webhook, GoHighLevel CRM adapter (wired
+into the worker).
 
 **Waiting on you (this document):** provider accounts + secrets (§2–§5),
 applying migrations to the production DB (§1a), the Clerk dashboard config

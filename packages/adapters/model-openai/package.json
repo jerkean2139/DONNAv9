@@ -1,0 +1,30 @@
+{
+  "name": "@donna/adapter-openai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI (and OpenAI-compatible) ModelAdapter for DONNA V2 — official openai SDK behind the adapter contract.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@donna/adapter-base": "workspace:*",
+    "@donna/config": "workspace:*",
+    "@donna/cost-governor": "workspace:*",
+    "openai": "^7.15.0"
+  }
+}
