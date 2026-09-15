@@ -37,6 +37,7 @@ DONNAv9/
 │  └─ adapters/       # Phase 3+ — one package per capability family (§7)
 │     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
 │     ├─ capability-fn/  # Phase 4 ✅ deterministic in-process capability adapter
+│     ├─ http/         # Phase 4 ✅ HTTP capability adapter (automation class, SSRF-safe)
 │     ├─ model-anthropic/  # Phase 4 ✅ Claude ModelAdapter (@anthropic-ai/sdk)
 │     ├─ model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/

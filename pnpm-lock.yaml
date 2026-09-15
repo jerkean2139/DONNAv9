@@ -153,6 +153,12 @@ importers:
         specifier: workspace:*
         version: link:../base
 
+  packages/adapters/http:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../base
+
   packages/adapters/model-anthropic:
     dependencies:
       '@anthropic-ai/sdk':
