@@ -22,7 +22,7 @@ DONNAv9/
 │  ├─ core-domain/    # Phase 0 ✅ pure domain types + state machines
 │  ├─ db/             # Phase 1 ✅ Drizzle schema, migrations, client
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
-│  ├─ events/         # Phase 1 — typed events + bus + projections
+│  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
 │  ├─ work-router/    # Phase 3 — execution-class selection
 │  ├─ model-router/   # Phase 4 — model/node selection + fallback
 │  ├─ cost-governor/  # Phase 4 — budgets, usage ledger, model evaluation
