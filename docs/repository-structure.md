@@ -23,7 +23,7 @@ DONNAv9/
 │  ├─ db/             # Phase 1 ✅ Drizzle schema, migrations, client
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
 │  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
-│  ├─ work-router/    # Phase 3 — execution-class selection
+│  ├─ work-router/    # Phase 3 ✅ execution-class selection (above Model Router)
 │  ├─ model-router/   # Phase 4 — model/node selection + fallback
 │  ├─ cost-governor/  # Phase 4 — budgets, usage ledger, model evaluation
 │  ├─ context/        # Phase 4 — Context Packet builder + budgeting
@@ -34,7 +34,8 @@ DONNAv9/
 │  ├─ config/         # Phase 4 — model registry, pricing, feature flags
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
 │  └─ adapters/       # Phase 3+ — one package per capability family (§7)
-│     ├─ base/  model-anthropic/  model-openai/  model-local/
+│     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
+│     ├─ model-anthropic/  model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/
 │     ├─ gmail/  drive/  ghl-zenoflo/  lead-builder/
 │     └─ coding-agent/  automation-mcp/

@@ -1,0 +1,28 @@
+{
+  "name": "@donna/work-router",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic Work Router for DONNA V2 — selects the execution class above the Model Router.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@donna/core-domain": "workspace:*",
+    "@donna/adapter-base": "workspace:*"
+  }
+}
