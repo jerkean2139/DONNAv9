@@ -24,6 +24,7 @@ DONNAv9/
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
 │  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
 │  ├─ work-router/    # Phase 3 ✅ execution-class selection (above Model Router)
+│  ├─ orchestrator/   # Phase 4 ✅ control-plane spine: policy→work→model→ledger
 │  ├─ model-router/   # Phase 4 ✅ model/node selection + fallback
 │  ├─ cost-governor/  # Phase 4 ✅ budgets, usage ledger, model evaluation
 │  ├─ context/        # Phase 4 ✅ Context Packet builder + budgeting
