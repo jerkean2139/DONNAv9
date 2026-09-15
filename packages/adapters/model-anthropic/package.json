@@ -1,0 +1,30 @@
+{
+  "name": "@donna/adapter-anthropic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Anthropic (Claude) ModelAdapter for DONNA V2 — official @anthropic-ai/sdk behind the adapter contract.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
+    "@donna/adapter-base": "workspace:*",
+    "@donna/config": "workspace:*",
+    "@donna/cost-governor": "workspace:*"
+  }
+}
