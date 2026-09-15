@@ -97,8 +97,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.get('/objectives/:id', async (request, reply) => {
+    const principal = devPrincipalFromHeaders(request.headers as Record<string, unknown>);
+    if (principal === null) {
+      return reply.code(401).send({ error: 'unauthenticated' });
+    }
     const { id } = request.params as { id: string };
-    const objective = await deps.objectiveService.get(id);
+    // Reads are tenant-scoped: another org's objective reads as not-found.
+    const objective = await deps.objectiveService.get(id, principal.organizationId);
     if (objective === null) {
       return reply.code(404).send({ error: 'not_found' });
     }
@@ -116,7 +121,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
 
     const { id } = request.params as { id: string };
-    const objective = await deps.objectiveService.get(id);
+    const objective = await deps.objectiveService.get(id, principal.organizationId);
     if (objective === null) {
       return reply.code(404).send({ error: 'objective_not_found' });
     }
