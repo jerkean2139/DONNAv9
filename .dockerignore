@@ -1,0 +1,12 @@
+# Keep build context small and force a clean install inside the image.
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/coverage
+.git
+.github
+*.log
+.env
+.env.*
+!.env.example

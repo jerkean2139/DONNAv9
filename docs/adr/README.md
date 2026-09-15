@@ -18,3 +18,4 @@ Affected Docs / Approver` (matching the Decisions Log's new-decision format).
 
 - [0001](0001-adopt-greenfield-v2-technical-plan.md) — Adopt the Greenfield V2 Technical Plan
 - [0002](0002-phase-0-tech-stack-defaults.md) — Phase 0 technology-stack defaults
+- [0003](0003-railway-hosting.md) — Railway hosting for the control-plane tier

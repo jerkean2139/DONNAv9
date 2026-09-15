@@ -109,6 +109,8 @@ importers:
         specifier: ^0.16.6
         version: 0.16.6(typescript@5.9.3)
 
+  packages/adapters/base: {}
+
   packages/core-domain: {}
 
   packages/db:
@@ -135,6 +137,15 @@ importers:
 
   packages/policy:
     dependencies:
+      '@donna/core-domain':
+        specifier: workspace:*
+        version: link:../core-domain
+
+  packages/work-router:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../adapters/base
       '@donna/core-domain':
         specifier: workspace:*
         version: link:../core-domain

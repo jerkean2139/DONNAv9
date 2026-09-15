@@ -15,7 +15,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test"
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "db:generate": "pnpm --filter @donna/db db:generate",
+    "db:migrate": "pnpm --filter @donna/db db:migrate"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
