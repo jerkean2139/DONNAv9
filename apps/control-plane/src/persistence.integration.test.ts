@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { DrizzleTaskDispatcher } from './services/task-dispatcher.js';
+import { DrizzleProvisioningService } from './webhooks/provisioning.js';
 
 /**
  * Live-database integration harness (plan §16). It exercises the real Drizzle
@@ -109,6 +110,56 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
 
     // An unknown subject resolves to null (no leak, no default access).
     expect(await resolver.resolve({ subject: 'nobody', claims: { sub: 'nobody' } })).toBeNull();
+  });
+
+  it('provisions org + user + membership from a Clerk membership event, then resolves', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const clerkOrgId = `org_${suffix}`;
+    const clerkUserId = `user_${suffix}`;
+    const provisioning = new DrizzleProvisioningService(db);
+
+    await provisioning.handle({
+      type: 'organizationMembership.created',
+      data: {
+        role: 'org:admin',
+        organization: { id: clerkOrgId, name: 'Acme', slug: `acme-${suffix}` },
+        public_user_data: { user_id: clerkUserId, identifier: `${suffix}@x.com`, first_name: 'J' },
+      },
+    });
+
+    // The provisioned member is now authorizable: the resolver maps the token
+    // subject to the trusted principal with the mapped role.
+    const principal = await new DrizzlePrincipalResolver(db).resolve({
+      subject: clerkUserId,
+      claims: { sub: clerkUserId },
+    });
+    expect(principal).not.toBeNull();
+    expect(principal!.role).toBe('admin');
+    expect(principal!.actorKind).toBe('human');
+
+    // A second sync is idempotent (updates role, no duplicate membership).
+    await provisioning.handle({
+      type: 'organizationMembership.updated',
+      data: {
+        role: 'org:member',
+        organization: { id: clerkOrgId, name: 'Acme', slug: `acme-${suffix}` },
+        public_user_data: { user_id: clerkUserId, identifier: `${suffix}@x.com` },
+      },
+    });
+    const rescoped = await new DrizzlePrincipalResolver(db).resolve({
+      subject: clerkUserId,
+      claims: { sub: clerkUserId },
+    });
+    expect(rescoped!.role).toBe('team_member');
+
+    // Revoking the user clears the mapping: the same token no longer resolves.
+    await provisioning.handle({ type: 'user.deleted', data: { id: clerkUserId, deleted: true } });
+    expect(
+      await new DrizzlePrincipalResolver(db).resolve({
+        subject: clerkUserId,
+        claims: { sub: clerkUserId },
+      }),
+    ).toBeNull();
   });
 
   it('reads are tenant-scoped: another org gets null', async () => {

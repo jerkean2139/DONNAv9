@@ -5,6 +5,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
 import type { Authenticator } from './auth/authenticate.js';
+import { ClerkPayloadError, parseClerkEvent } from './webhooks/clerk-events.js';
+import { WebhookVerificationError, type WebhookVerifier } from './webhooks/clerk-verify.js';
+import type { ProvisioningService } from './webhooks/provisioning.js';
 import type { ObjectiveService } from './services/objective-service.js';
 import type { TaskDispatcher } from './services/task-dispatcher.js';
 
@@ -18,6 +21,27 @@ export interface ServerDeps {
    * shim only when no provider is configured (§6/§8).
    */
   readonly authenticate: Authenticator;
+  /**
+   * Clerk provisioning webhook. When present, `POST /webhooks/clerk` is served,
+   * authenticated by the Svix signature (not the JWT authenticator) and applied
+   * by the provisioning service. Absent → the route is not registered.
+   */
+  readonly clerkWebhook?: {
+    readonly verifier: WebhookVerifier;
+    readonly provisioning: ProvisioningService;
+  };
+}
+
+function svixHeaders(headers: Record<string, unknown>): Record<string, string> {
+  const pick = (key: string): string => {
+    const value = headers[key];
+    return typeof value === 'string' ? value : Array.isArray(value) ? (value[0] ?? '') : '';
+  };
+  return {
+    'svix-id': pick('svix-id'),
+    'svix-timestamp': pick('svix-timestamp'),
+    'svix-signature': pick('svix-signature'),
+  };
 }
 
 interface CreateObjectiveBody {
@@ -57,6 +81,25 @@ function asStringArray(value: unknown): readonly string[] | null {
  */
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false });
+
+  // The Clerk webhook must verify the Svix signature over the RAW body, so keep
+  // it alongside the parsed JSON. Only installed when the webhook is configured,
+  // so other deployments keep Fastify's default parser untouched.
+  if (deps.clerkWebhook !== undefined) {
+    app.removeContentTypeParser('application/json');
+    app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+      (req as { rawBody?: string }).rawBody = body as string;
+      if (body === '') {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(body as string));
+      } catch (error) {
+        done(error as Error, undefined);
+      }
+    });
+  }
 
   app.get('/health', async () => ({ status: 'ok' }));
 
@@ -182,6 +225,38 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
     return reply.code(202).send({ status: 'queued', task, jobId });
   });
+
+  // Clerk provisioning webhook — authenticated by the Svix signature over the
+  // raw body, NOT the JWT authenticator. Verify first (401 on a bad signature),
+  // then apply the event (400 on a malformed payload). Unknown event types are a
+  // 200 no-op so Clerk does not retry them.
+  if (deps.clerkWebhook !== undefined) {
+    const { verifier, provisioning } = deps.clerkWebhook;
+    app.post('/webhooks/clerk', async (request, reply) => {
+      const rawBody = (request as { rawBody?: string }).rawBody ?? '';
+      let verified: unknown;
+      try {
+        verified = verifier.verify(
+          rawBody,
+          svixHeaders(request.headers as Record<string, unknown>),
+        );
+      } catch (error) {
+        if (error instanceof WebhookVerificationError) {
+          return reply.code(401).send({ error: 'invalid_signature' });
+        }
+        throw error;
+      }
+      try {
+        const { handled } = await provisioning.handle(parseClerkEvent(verified));
+        return reply.code(200).send({ handled });
+      } catch (error) {
+        if (error instanceof ClerkPayloadError) {
+          return reply.code(400).send({ error: error.message });
+        }
+        throw error;
+      }
+    });
+  }
 
   return app;
 }
