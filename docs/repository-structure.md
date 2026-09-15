@@ -24,14 +24,14 @@ DONNAv9/
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
 │  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
 │  ├─ work-router/    # Phase 3 ✅ execution-class selection (above Model Router)
-│  ├─ model-router/   # Phase 4 — model/node selection + fallback
-│  ├─ cost-governor/  # Phase 4 — budgets, usage ledger, model evaluation
-│  ├─ context/        # Phase 4 — Context Packet builder + budgeting
+│  ├─ model-router/   # Phase 4 ✅ model/node selection + fallback
+│  ├─ cost-governor/  # Phase 4 ✅ budgets, usage ledger, model evaluation
+│  ├─ context/        # Phase 4 ✅ Context Packet builder + budgeting
 │  ├─ memory/         # Phase 6 — semantic memory adapter (pgvector)
 │  ├─ knowledge/      # Phase 6 — source ingestion + provenance
 │  ├─ skills/         # Phase 8 — Skill Registry + SOP promotion
 │  ├─ telemetry/      # Phase 4+ — OpenTelemetry + Donna Health
-│  ├─ config/         # Phase 4 — model registry, pricing, feature flags
+│  ├─ config/         # Phase 4 ✅ model registry, pricing, feature flags
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
 │  └─ adapters/       # Phase 3+ — one package per capability family (§7)
 │     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
