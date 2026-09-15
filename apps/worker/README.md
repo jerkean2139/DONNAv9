@@ -33,8 +33,11 @@ drains the transactional outbox to the event bus.
 - **`rowToEnvelope` / `envelopeToInsert`** — pure row ↔ `EventEnvelope` mappings
   (unit-tested without a database).
 - **`runWorker(config)`** — boots graphile-worker with both tasks. The delivered
-  event bus and capability registry are injectable; the production transport and
-  capability adapters plug in later.
+  event bus is injectable (production transport plugs in later). A
+  `capabilityCatalog` (`@donna/orchestrator`) is injectable too: when provided it
+  feeds both the Work Router registry and the capability-adapter resolver from
+  one source, so non-AI classes (e.g. deterministic `@donna/adapter-capability-fn`
+  handlers) execute instead of parking as `blocked`. Empty by default.
 
 ## Running
 

@@ -24,7 +24,7 @@ DONNAv9/
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
 │  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
 │  ├─ work-router/    # Phase 3 ✅ execution-class selection (above Model Router)
-│  ├─ orchestrator/   # Phase 4 ✅ control-plane spine: policy→work→model→ledger
+│  ├─ orchestrator/   # Phase 4 ✅ spine: policy→work→model/capability→ledger; catalog
 │  ├─ model-router/   # Phase 4 ✅ model/node selection + fallback
 │  ├─ cost-governor/  # Phase 4 ✅ budgets, usage ledger, model evaluation
 │  ├─ context/        # Phase 4 ✅ Context Packet builder + budgeting
@@ -36,6 +36,7 @@ DONNAv9/
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
 │  └─ adapters/       # Phase 3+ — one package per capability family (§7)
 │     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
+│     ├─ capability-fn/  # Phase 4 ✅ deterministic in-process capability adapter
 │     ├─ model-anthropic/  # Phase 4 ✅ Claude ModelAdapter (@anthropic-ai/sdk)
 │     ├─ model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/

@@ -9,3 +9,4 @@
  */
 export * from './work-order.js';
 export * from './orchestrator.js';
+export * from './capability-catalog.js';

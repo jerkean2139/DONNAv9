@@ -3,6 +3,7 @@ import { UsageLedger } from '@donna/cost-governor';
 import { createDatabase } from '@donna/db';
 import { InMemoryEventBus, OutboxDispatcher, type EventBus } from '@donna/events';
 import {
+  CapabilityCatalog,
   executeWorkOrder,
   EXECUTE_WORK_ORDER_TASK,
   type OrchestratorDeps,
@@ -27,8 +28,15 @@ export interface WorkerConfig {
    */
   readonly bus?: EventBus;
   /**
-   * Capability registry the Work Router consults. Empty by default; deterministic
-   * and automation capability adapters register their entries here as they land.
+   * Non-AI capability catalog — the single source of truth for the Work Router
+   * registry and the capability-adapter resolver (they must not drift). Empty by
+   * default, so non-AI classes park as `blocked` until real adapters register.
+   * Takes precedence over `workRegistry` when provided.
+   */
+  readonly capabilityCatalog?: CapabilityCatalog;
+  /**
+   * Capability registry the Work Router consults directly. Used only when no
+   * `capabilityCatalog` is given; the catalog is the preferred wiring.
    */
   readonly workRegistry?: CapabilityRegistry;
 }
@@ -58,14 +66,18 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
   const batchSize = config.outboxBatchSize ?? 500;
 
   // Orchestrator dependencies (the composition root). The orchestrator stays
-  // provider-agnostic: vendors are bound only in `resolveModelAdapter`, and its
-  // events are written to the outbox — never delivered live from here.
+  // provider-agnostic: vendors are bound only in the resolvers, and its events
+  // are written to the outbox — never delivered live from here. The capability
+  // catalog feeds both the Work Router registry and the capability resolver, so
+  // routing and execution cannot drift.
+  const catalog = config.capabilityCatalog;
   const deps: OrchestratorDeps = {
     bus: new DrizzleOutboxBus(db),
-    workRegistry: config.workRegistry ?? new CapabilityRegistry(),
+    workRegistry: catalog?.toWorkRegistry() ?? config.workRegistry ?? new CapabilityRegistry(),
     modelRegistry: MODEL_REGISTRY,
     ledger: new UsageLedger(),
     resolveModelAdapter: createModelAdapterResolver(MODEL_REGISTRY),
+    ...(catalog !== undefined ? { resolveCapabilityAdapter: catalog.resolver() } : {}),
   };
 
   return run({

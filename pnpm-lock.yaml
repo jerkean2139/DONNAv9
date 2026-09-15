@@ -141,6 +141,12 @@ importers:
 
   packages/adapters/base: {}
 
+  packages/adapters/capability-fn:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../base
+
   packages/adapters/model-anthropic:
     dependencies:
       '@anthropic-ai/sdk':

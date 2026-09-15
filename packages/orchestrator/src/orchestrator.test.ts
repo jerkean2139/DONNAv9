@@ -1,7 +1,9 @@
 import type {
+  CapabilityAdapter,
   CapabilitySpec,
   CostEstimate,
   ErrorClass,
+  ExecutionContext,
   HealthReport,
   ModelAdapter,
   ModelCapabilities,
@@ -16,8 +18,30 @@ import { InMemoryEventBus } from '@donna/events';
 import { CapabilityRegistry } from '@donna/work-router';
 import { describe, expect, it } from 'vitest';
 
+import { CapabilityCatalog } from './capability-catalog.js';
 import { executeWorkOrder } from './orchestrator.js';
 import type { OrchestratorDeps, WorkOrder } from './work-order.js';
+
+/** A fake non-AI CapabilityAdapter with configurable execute behavior. */
+function fakeCapabilityAdapter(
+  id: string,
+  execute: (input: unknown, ctx: ExecutionContext) => Promise<unknown>,
+  provides: readonly string[] = [],
+  estimateUsd = 0,
+): CapabilityAdapter {
+  return {
+    id,
+    name: id,
+    version: '1',
+    capabilities: (): CapabilitySpec => ({ id, name: id, version: '1', capabilities: provides }),
+    health: (): Promise<HealthReport> => Promise.resolve({ status: 'healthy' }),
+    estimate: (): Promise<CostEstimate> =>
+      Promise.resolve({ costUsd: estimateUsd, latencyMs: 0, confidence: 1 }),
+    execute: (input, ctx): Promise<unknown> => execute(input, ctx),
+    reportUsage: () => ({ costUsd: estimateUsd, latencyMs: 1 }),
+    classifyError: (): ErrorClass => 'deterministic',
+  };
+}
 
 const cloudModel: ModelEntry = {
   id: 'claude-sonnet-5',
@@ -253,6 +277,72 @@ describe('executeWorkOrder — gates and non-AI classes', () => {
     );
     expect(result.status).toBe('blocked');
     expect(result.executionClass).toBe('deterministic');
+    expect(result.capabilityId).toBe('crm.sync');
+  });
+});
+
+describe('executeWorkOrder — capability adapters', () => {
+  /** Wire deps from a catalog so routing and execution share one source. */
+  function capabilityDeps(adapter: CapabilityAdapter, executionClass = 'deterministic' as const) {
+    const catalog = new CapabilityCatalog().register(adapter, executionClass, {
+      provides: adapter.capabilities().capabilities,
+    });
+    const { deps, events, ledger } = makeDeps({
+      workRegistry: catalog.toWorkRegistry(),
+      resolveCapabilityAdapter: catalog.resolver(),
+    });
+    return { deps, events, ledger };
+  }
+
+  it('runs a deterministic capability, records usage, emits events', async () => {
+    const adapter = fakeCapabilityAdapter(
+      'crm.sync',
+      (input) => Promise.resolve({ synced: input }),
+      ['crm'],
+      0.002,
+    );
+    const { deps, events, ledger } = capabilityDeps(adapter);
+    const result = await executeWorkOrder(
+      { organizationId: 'org1', taskId: 't1', requiredCapabilities: ['crm'], capabilityInput: 42 },
+      deps,
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.executionClass).toBe('deterministic');
+    expect(result.capabilityId).toBe('crm.sync');
+    expect(result.output).toEqual({ synced: 42 });
+    expect(ledger.totalUsd()).toBeCloseTo(0.002);
+    expect(events).toEqual(
+      expect.arrayContaining(['task.planned', 'worker.started', 'tool.called', 'task.completed']),
+    );
+  });
+
+  it('fails (no fallback) when the capability adapter throws', async () => {
+    const adapter = fakeCapabilityAdapter('crm.sync', () => Promise.reject(new Error('bad')), [
+      'crm',
+    ]);
+    const { deps, events } = capabilityDeps(adapter);
+    const result = await executeWorkOrder(
+      { organizationId: 'org1', requiredCapabilities: ['crm'] },
+      deps,
+    );
+    expect(result.status).toBe('failed');
+    expect(result.reason).toBe('adapter_error');
+    expect(events).toContain('task.failed');
+  });
+
+  it('blocks on budget before executing the capability', async () => {
+    const adapter = fakeCapabilityAdapter('crm.sync', () => Promise.resolve('done'), ['crm'], 0.5);
+    const { deps } = capabilityDeps(adapter);
+    const result = await executeWorkOrder(
+      {
+        organizationId: 'org1',
+        requiredCapabilities: ['crm'],
+        budget: { budget: { scope: 'task', scopeRef: 't1', limitUsd: 0.01 }, spentUsd: 0 },
+      },
+      deps,
+    );
+    expect(result.status).toBe('budget_exceeded');
     expect(result.capabilityId).toBe('crm.sync');
   });
 });
