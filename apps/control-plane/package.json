@@ -19,7 +19,9 @@
   "dependencies": {
     "@donna/core-domain": "workspace:*",
     "@donna/events": "workspace:*",
+    "@donna/orchestrator": "workspace:*",
     "@donna/policy": "workspace:*",
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "graphile-worker": "^0.16.6"
   }
 }

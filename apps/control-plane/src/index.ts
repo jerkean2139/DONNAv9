@@ -11,5 +11,17 @@ export {
   type ObjectiveService,
   type CreateObjectiveInput,
 } from './services/objective-service.js';
+export {
+  InMemoryTaskService,
+  type TaskService,
+  type CreateTaskInput,
+} from './services/task-service.js';
+export {
+  GraphileWorkQueue,
+  InMemoryWorkQueue,
+  createGraphileWorkQueue,
+  type WorkQueue,
+  type JobAdder,
+} from './services/work-queue.js';
 export { devPrincipalFromHeaders } from './principal.js';
-export { OBJECTIVE_CREATE_ACTION } from './actions.js';
+export { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';

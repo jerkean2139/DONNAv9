@@ -41,12 +41,18 @@ importers:
       '@donna/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@donna/orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/orchestrator
       '@donna/policy':
         specifier: workspace:*
         version: link:../../packages/policy
       fastify:
         specifier: ^5.1.0
         version: 5.12.4
+      graphile-worker:
+        specifier: ^0.16.6
+        version: 0.16.6(typescript@5.9.3)
 
   apps/web:
     dependencies:

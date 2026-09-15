@@ -12,3 +12,16 @@ export const OBJECTIVE_CREATE_ACTION: ActionDescriptor = {
   authorityLevel: AUTHORITY_LEVELS.PREPARE,
   sideEffecting: false,
 };
+
+/**
+ * Dispatching a task creates the durable task and enqueues a work order for the
+ * orchestrator to route. Dispatch itself is Prepare-level and non-side-effecting
+ * — it schedules planning/execution, it does not perform the outward action. The
+ * task carries its own required authority, and the orchestrator's deterministic
+ * policy gate re-enforces it before any side-effecting step runs.
+ */
+export const TASK_DISPATCH_ACTION: ActionDescriptor = {
+  name: 'task.dispatch',
+  authorityLevel: AUTHORITY_LEVELS.PREPARE,
+  sideEffecting: false,
+};
