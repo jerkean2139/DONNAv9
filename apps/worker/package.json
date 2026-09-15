@@ -19,6 +19,9 @@
   "dependencies": {
     "@donna/adapter-anthropic": "workspace:*",
     "@donna/adapter-base": "workspace:*",
+    "@donna/adapter-ghl": "workspace:*",
+    "@donna/adapter-local": "workspace:*",
+    "@donna/adapter-openai": "workspace:*",
     "@donna/config": "workspace:*",
     "@donna/core-domain": "workspace:*",
     "@donna/cost-governor": "workspace:*",

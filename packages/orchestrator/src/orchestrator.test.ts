@@ -28,6 +28,7 @@ function fakeCapabilityAdapter(
   execute: (input: unknown, ctx: ExecutionContext) => Promise<unknown>,
   provides: readonly string[] = [],
   estimateUsd = 0,
+  classify: (e: unknown) => ErrorClass = () => 'deterministic',
 ): CapabilityAdapter {
   return {
     id,
@@ -39,7 +40,7 @@ function fakeCapabilityAdapter(
       Promise.resolve({ costUsd: estimateUsd, latencyMs: 0, confidence: 1 }),
     execute: (input, ctx): Promise<unknown> => execute(input, ctx),
     reportUsage: () => ({ costUsd: estimateUsd, latencyMs: 1 }),
-    classifyError: (): ErrorClass => 'deterministic',
+    classifyError: classify,
   };
 }
 
@@ -344,5 +345,116 @@ describe('executeWorkOrder — capability adapters', () => {
     );
     expect(result.status).toBe('budget_exceeded');
     expect(result.capabilityId).toBe('crm.sync');
+  });
+});
+
+describe('executeWorkOrder — cross-class fallback', () => {
+  const retryable = (): ErrorClass => 'unavailable';
+
+  /** Wire deps from a catalog holding several capabilities for the same need. */
+  function multiDeps(...adapters: readonly [CapabilityAdapter, ExecutionClass][]) {
+    const catalog = new CapabilityCatalog();
+    for (const [adapter, executionClass] of adapters) {
+      catalog.register(adapter, executionClass, { provides: adapter.capabilities().capabilities });
+    }
+    return makeDeps({
+      workRegistry: catalog.toWorkRegistry(),
+      resolveCapabilityAdapter: catalog.resolver(),
+    });
+  }
+
+  it('falls through to the next class when a capability fails retryably', async () => {
+    const det = fakeCapabilityAdapter(
+      'crm.det',
+      () => Promise.reject(new Error('down')),
+      ['crm'],
+      0,
+      retryable,
+    );
+    const auto = fakeCapabilityAdapter('crm.auto', (input) => Promise.resolve({ via: input }), [
+      'crm',
+    ]);
+    const { deps, events } = multiDeps([det, 'deterministic'], [auto, 'automation']);
+    const result = await executeWorkOrder(
+      { organizationId: 'org1', requiredCapabilities: ['crm'], capabilityInput: 7 },
+      deps,
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.executionClass).toBe('automation');
+    expect(result.capabilityId).toBe('crm.auto');
+    expect(result.output).toEqual({ via: 7 });
+    expect(events).toContain('task.completed');
+  });
+
+  it('does NOT fall through on a non-retryable (deterministic) failure', async () => {
+    let autoCalled = false;
+    const det = fakeCapabilityAdapter('crm.det', () => Promise.reject(new Error('bad request')), [
+      'crm',
+    ]); // default classify → 'deterministic' (non-retryable)
+    const auto = fakeCapabilityAdapter(
+      'crm.auto',
+      () => {
+        autoCalled = true;
+        return Promise.resolve('should-not-run');
+      },
+      ['crm'],
+    );
+    const { deps } = multiDeps([det, 'deterministic'], [auto, 'automation']);
+    const result = await executeWorkOrder(
+      { organizationId: 'org1', requiredCapabilities: ['crm'] },
+      deps,
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.reason).toBe('adapter_error');
+    expect(result.executionClass).toBe('deterministic');
+    expect(result.capabilityId).toBe('crm.det');
+    expect(autoCalled).toBe(false);
+  });
+
+  it('escalates capability → AI when every capability fails retryably and reasoning is allowed', async () => {
+    const det = fakeCapabilityAdapter(
+      'crm.det',
+      () => Promise.reject(new Error('down')),
+      ['crm'],
+      0,
+      retryable,
+    );
+    const { deps } = multiDeps([det, 'deterministic']);
+    const result = await executeWorkOrder(
+      {
+        organizationId: 'org1',
+        requiredCapabilities: ['crm'],
+        needsReasoning: true,
+        reasoningTier: 5,
+        modelRequest: { messages: [{ role: 'user', content: 'do it' }] },
+      },
+      deps,
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.executionClass).toBe('cloud_ai');
+    expect(result.modelId).toBe('claude-sonnet-5');
+    expect(result.text).toBe('echo:do it');
+  });
+
+  it('fails (no AI escalation) when reasoning is not allowed and all capabilities fail retryably', async () => {
+    const det = fakeCapabilityAdapter(
+      'crm.det',
+      () => Promise.reject(new Error('down')),
+      ['crm'],
+      0,
+      retryable,
+    );
+    const { deps } = multiDeps([det, 'deterministic']);
+    const result = await executeWorkOrder(
+      { organizationId: 'org1', requiredCapabilities: ['crm'] },
+      deps,
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.reason).toBe('adapter_error');
+    expect(result.executionClass).toBe('deterministic');
   });
 });

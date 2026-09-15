@@ -90,6 +90,24 @@ export function routeWork(
 }
 
 /**
+ * Ordered candidate capabilities for the orchestrator's cross-class fallback:
+ * every healthy provider of the required set, least-complex execution class
+ * first (deterministic → automation → …), same matching as {@link routeWork}
+ * but the full list instead of only the top pick. A retryable failure in one
+ * can then fall through to the next — including across execution classes.
+ *
+ * `prefersHuman` yields no candidates: the order wants a human, not a
+ * capability, and the orchestrator handles that class directly.
+ */
+export function candidateCapabilities(
+  input: WorkRoutingInput,
+  registry: CapabilityRegistry,
+): RegisteredCapability[] {
+  if (input.prefersHuman === true) return [];
+  return [...registry.healthyProviding(input.requiredCapabilities)].sort(byPreference);
+}
+
+/**
  * Ordered execution-class candidates for the orchestrator's fallback chain:
  * the matched classes first (least-complex first), then cloud AI when reasoning
  * is allowed, always ending at a human. Deduplicated, order preserved.

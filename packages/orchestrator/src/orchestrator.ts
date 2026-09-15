@@ -12,7 +12,7 @@ import {
 import { createEvent } from '@donna/events';
 import { evaluate } from '@donna/policy';
 import { routeModel } from '@donna/model-router';
-import { routeWork } from '@donna/work-router';
+import { candidateCapabilities, routeWork } from '@donna/work-router';
 
 import type { OrchestratorDeps, WorkOrder, WorkOrderResult } from './work-order.js';
 
@@ -75,72 +75,106 @@ export async function executeWorkOrder(
     return { status: 'awaiting_human', executionClass: 'human', reason: routing.reason };
   }
 
-  // 3a. Non-AI capability classes run through a bound capability adapter
-  //     (deterministic/automation/…). If none is wired for the matched
-  //     capability, the work parks as blocked rather than falling to an LLM.
-  if (!isAiExecutionClass(routing.executionClass)) {
-    const capabilityId = routing.capabilityId;
-    const adapter =
-      capabilityId !== undefined ? deps.resolveCapabilityAdapter?.(capabilityId) : undefined;
-    if (adapter === undefined) {
+  // 3a. Non-AI capability classes run through bound capability adapters
+  //     (deterministic/automation/…), tried in preference order. A retryable
+  //     failure in one falls through to the next candidate — including across
+  //     execution classes (cross-class fallback). A non-retryable (deterministic)
+  //     failure fails the order immediately: retrying a different class cannot
+  //     fix a bad request. If no adapter is wired for any matched capability the
+  //     work parks as blocked; if every wired adapter fails retryably it escalates
+  //     to AI only when the order allows reasoning, never silently.
+  let executionClass = routing.executionClass;
+
+  if (!isAiExecutionClass(executionClass)) {
+    const candidates = candidateCapabilities(
+      {
+        requiredCapabilities: order.requiredCapabilities,
+        ...(order.prefersHuman !== undefined ? { prefersHuman: order.prefersHuman } : {}),
+        ...(order.needsReasoning !== undefined ? { needsReasoning: order.needsReasoning } : {}),
+      },
+      deps.workRegistry,
+    );
+    const ctx = order.correlationId !== undefined ? { correlationId: order.correlationId } : {};
+
+    let attempted = false;
+    for (const candidate of candidates) {
+      const adapter = deps.resolveCapabilityAdapter?.(candidate.id);
+      if (adapter === undefined) continue; // matched in the registry but not wired
+      attempted = true;
+
+      if (order.budget !== undefined) {
+        const est = await adapter.estimate(order.capabilityInput, ctx);
+        const check = checkBudget(order.budget.budget, order.budget.spentUsd, est.costUsd);
+        if (!check.allowed) {
+          await emit('task.blocked');
+          return {
+            status: 'budget_exceeded',
+            executionClass: candidate.executionClass,
+            capabilityId: candidate.id,
+          };
+        }
+      }
+
+      await emit('worker.started');
+      await emit('tool.called');
+      try {
+        const output = await adapter.execute(order.capabilityInput, ctx);
+        const usage = adapter.reportUsage();
+        // Capability spend lands in the same ledger, keyed by capability id (no
+        // tokens — deterministic/automation work is not model-metered).
+        deps.ledger.record({
+          modelId: candidate.id,
+          provider: 'capability',
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: usage?.costUsd ?? 0,
+          latencyMs: usage?.latencyMs ?? 0,
+          ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
+        });
+        await emit('task.completed');
+        return {
+          status: 'completed',
+          executionClass: candidate.executionClass,
+          output,
+          capabilityId: candidate.id,
+        };
+      } catch (error) {
+        // Only fall through to the next candidate on a retryable failure.
+        if (!isRetryable(adapter.classifyError(error))) {
+          await emit('task.failed');
+          return {
+            status: 'failed',
+            executionClass: candidate.executionClass,
+            reason: 'adapter_error',
+            capabilityId: candidate.id,
+          };
+        }
+      }
+    }
+
+    // Non-AI candidates exhausted.
+    if (!attempted) {
+      // Matched in the registry but no adapter is wired — park, don't escalate.
       await emit('task.blocked');
       return {
         status: 'blocked',
         executionClass: routing.executionClass,
         reason: 'no_capability_adapter',
-        ...(capabilityId !== undefined ? { capabilityId } : {}),
+        ...(routing.capabilityId !== undefined ? { capabilityId: routing.capabilityId } : {}),
       };
     }
-
-    const ctx = order.correlationId !== undefined ? { correlationId: order.correlationId } : {};
-
-    if (order.budget !== undefined) {
-      const est = await adapter.estimate(order.capabilityInput, ctx);
-      const check = checkBudget(order.budget.budget, order.budget.spentUsd, est.costUsd);
-      if (!check.allowed) {
-        await emit('task.blocked');
-        return {
-          status: 'budget_exceeded',
-          executionClass: routing.executionClass,
-          ...(capabilityId !== undefined ? { capabilityId } : {}),
-        };
-      }
-    }
-
-    await emit('worker.started');
-    await emit('tool.called');
-    try {
-      const output = await adapter.execute(order.capabilityInput, ctx);
-      const usage = adapter.reportUsage();
-      // Capability spend lands in the same ledger, keyed by capability id (no
-      // tokens — deterministic/automation work is not model-metered).
-      deps.ledger.record({
-        modelId: capabilityId ?? adapter.id,
-        provider: 'capability',
-        inputTokens: 0,
-        outputTokens: 0,
-        costUsd: usage?.costUsd ?? 0,
-        latencyMs: usage?.latencyMs ?? 0,
-        ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
-      });
-      await emit('task.completed');
-      return {
-        status: 'completed',
-        executionClass: routing.executionClass,
-        output,
-        ...(capabilityId !== undefined ? { capabilityId } : {}),
-      };
-    } catch {
-      // Capability failures do not fall back to another class here; the
-      // orchestrator's cross-class fallback chain is a later increment.
+    if (order.needsReasoning !== true) {
+      // Every wired adapter failed retryably and AI reasoning is not permitted.
       await emit('task.failed');
       return {
         status: 'failed',
         executionClass: routing.executionClass,
         reason: 'adapter_error',
-        ...(capabilityId !== undefined ? { capabilityId } : {}),
+        ...(routing.capabilityId !== undefined ? { capabilityId: routing.capabilityId } : {}),
       };
     }
+    // Cross-class fallback: capability → AI. Continue into the model path below.
+    executionClass = 'cloud_ai';
   }
 
   // 3b. AI class → Model Router picks the model/node, then the adapter runs it.
@@ -148,7 +182,7 @@ export async function executeWorkOrder(
     await emit('task.failed');
     return {
       status: 'failed',
-      executionClass: routing.executionClass,
+      executionClass,
       reason: 'missing_model_request',
     };
   }
@@ -168,7 +202,7 @@ export async function executeWorkOrder(
     await emit('task.failed');
     return {
       status: 'failed',
-      executionClass: routing.executionClass,
+      executionClass,
       reason: 'no_eligible_model',
     };
   }
@@ -187,7 +221,7 @@ export async function executeWorkOrder(
         await emit('task.blocked');
         return {
           status: 'budget_exceeded',
-          executionClass: routing.executionClass,
+          executionClass,
           modelId: entry.id,
         };
       }
@@ -212,7 +246,7 @@ export async function executeWorkOrder(
       await emit('task.completed');
       return {
         status: 'completed',
-        executionClass: routing.executionClass,
+        executionClass,
         modelId: entry.id,
         text: result.text,
       };
@@ -226,7 +260,7 @@ export async function executeWorkOrder(
   await emit('task.failed');
   return {
     status: 'failed',
-    executionClass: routing.executionClass,
+    executionClass,
     reason: lastErrorClass === undefined ? 'no_adapter' : 'adapter_error',
   };
 }

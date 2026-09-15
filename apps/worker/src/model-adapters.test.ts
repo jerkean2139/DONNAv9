@@ -25,6 +25,14 @@ const openai: ModelEntry = {
   displayName: 'OpenAI X',
 };
 
+const local: ModelEntry = {
+  ...anthropic,
+  id: 'local-x',
+  provider: 'local',
+  displayName: 'Local X',
+  privacy: 'local',
+};
+
 describe('createModelAdapterResolver', () => {
   let priorKey: string | undefined;
 
@@ -45,11 +53,6 @@ describe('createModelAdapterResolver', () => {
     expect(resolve('nope')).toBeUndefined();
   });
 
-  it('returns undefined for a provider with no adapter yet', () => {
-    const resolve = createModelAdapterResolver([openai]);
-    expect(resolve('openai-x')).toBeUndefined();
-  });
-
   it('binds an Anthropic model to an AnthropicModelAdapter', () => {
     const resolve = createModelAdapterResolver([anthropic]);
     const adapter = resolve('claude-sonnet-5');
@@ -60,5 +63,25 @@ describe('createModelAdapterResolver', () => {
   it('caches the adapter per model id', () => {
     const resolve = createModelAdapterResolver([anthropic]);
     expect(resolve('claude-sonnet-5')).toBe(resolve('claude-sonnet-5'));
+  });
+
+  it('leaves OpenAI unresolved until OPENAI_API_KEY is configured', () => {
+    expect(createModelAdapterResolver([openai], {})('openai-x')).toBeUndefined();
+  });
+
+  it('binds an OpenAI model to an OpenAiModelAdapter when the key is set', () => {
+    const resolve = createModelAdapterResolver([openai], { OPENAI_API_KEY: 'sk-test' });
+    expect(resolve('openai-x')?.id).toBe('openai:openai-x');
+  });
+
+  it('leaves a local model unresolved until LOCAL_MODEL_BASE_URL is configured', () => {
+    expect(createModelAdapterResolver([local], {})('local-x')).toBeUndefined();
+  });
+
+  it('binds a local model to a LocalModelAdapter when the endpoint is set', () => {
+    const resolve = createModelAdapterResolver([local], {
+      LOCAL_MODEL_BASE_URL: 'http://127.0.0.1:11434/v1',
+    });
+    expect(resolve('local-x')?.id).toBe('local:local-x');
   });
 });
