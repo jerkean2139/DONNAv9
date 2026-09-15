@@ -1,4 +1,4 @@
-import { createDatabase, type DonnaDatabase } from '@donna/db';
+import { createDatabase, runDrizzleMigrations, type DonnaDatabase } from '@donna/db';
 import { InMemoryEventBus } from '@donna/events';
 import { runMigrations } from 'graphile-worker';
 import { createRemoteJWKSet } from 'jose';
@@ -57,8 +57,11 @@ const connectionString = process.env.DATABASE_URL;
 
 let deps: ServerDeps;
 if (connectionString !== undefined && connectionString !== '') {
-  // Ensure graphile-worker's schema exists so the dispatcher's transactional
-  // `add_job` resolves even if the worker process has not booted yet.
+  // Apply the schema on boot so a deploy with DATABASE_URL set fully prepares
+  // the database with no terminal step (§16): the application schema (Drizzle)
+  // and graphile-worker's queue schema, the latter so the dispatcher's
+  // transactional `add_job` resolves even if the worker has not booted yet.
+  await runDrizzleMigrations(connectionString);
   await runMigrations({ connectionString });
   const db = createDatabase(connectionString);
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
