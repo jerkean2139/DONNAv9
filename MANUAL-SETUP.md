@@ -246,23 +246,33 @@ test location first.
 
 ## 6. Railway service configuration
 
-For **each** deployed service (control-plane and worker), in Railway →
-service → **Variables**, set the variables that service needs:
+DONNA runs as **two processes**, so you need **two Railway services** in the same
+project, both deploying this repo:
 
-- **control-plane:** `DATABASE_URL`, `AUTH_JWKS_URL` (+ the other `AUTH_*`),
-  `CLERK_WEBHOOK_SECRET`, `PORT` (optional — defaults to `3000`).
-- **worker:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GHL_TOKEN`
+| Service | Runs                                                  | Config file (set in service → Settings → **Config File**) |
+| ------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| API     | the control-plane (HTTP API, migrates the DB on boot) | `railway.control-plane.json`                              |
+| Worker  | the worker (processes queued jobs)                    | `railway.worker.json`                                     |
+
+Those two committed config files pin the build command (`pnpm run build`), the
+start command (`pnpm --filter @donna/<app> start`), and — for the API — the
+`/health` healthcheck. Without a config file Railway's autodetect fails on this
+monorepo (`No start command detected`), so **point each service at its file** in
+**Settings → Config File** (a.k.a. "Railway Config File" / config-as-code path).
+Leave **Root Directory** at the repo root `/` for both.
+
+Then, in each service → **Variables**, set what that service needs:
+
+- **API (control-plane):** `DATABASE_URL`, `AUTH_JWKS_URL` (+ the other `AUTH_*`),
+  `CLERK_WEBHOOK_SECRET`. Do **not** set `PORT` — Railway injects it and the app
+  reads it automatically.
+- **Worker:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GHL_TOKEN`
   (+ `GHL_LOCATION_ID` if used), and optionally `OPENAI_API_KEY` /
   `LOCAL_MODEL_BASE_URL` to enable those providers.
 
-`PORT` (control-plane only) is optional:
-
-```powershell
-$env:PORT = "3000"
-```
-
-Railway sets `DATABASE_URL` automatically if the Postgres plugin is in the same
-project; the rest you paste in from the provider dashboards above.
+Wire `DATABASE_URL` by **reference**, not by pasting the secret: in the Variables
+editor type `${{` and pick your Postgres service's `DATABASE_URL` (it becomes
+`${{Postgres.DATABASE_URL}}`).
 
 ---
 
