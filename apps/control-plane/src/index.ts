@@ -16,6 +16,14 @@ export {
   type TaskService,
   type CreateTaskInput,
 } from './services/task-service.js';
+export { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
+export {
+  InMemoryTaskDispatcher,
+  DrizzleTaskDispatcher,
+  type TaskDispatcher,
+  type DispatchInput,
+  type DispatchResult,
+} from './services/task-dispatcher.js';
 export {
   GraphileWorkQueue,
   InMemoryWorkQueue,
@@ -23,5 +31,13 @@ export {
   type WorkQueue,
   type JobAdder,
 } from './services/work-queue.js';
+export {
+  objectiveToRow,
+  rowToObjective,
+  taskToRow,
+  rowToTask,
+  buildWorkOrder,
+  type WorkOrderHints,
+} from './db/mappers.js';
 export { devPrincipalFromHeaders } from './principal.js';
 export { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';

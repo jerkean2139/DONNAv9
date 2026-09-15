@@ -6,13 +6,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
 import { devPrincipalFromHeaders } from './principal.js';
 import type { ObjectiveService } from './services/objective-service.js';
-import type { TaskService } from './services/task-service.js';
-import type { WorkQueue } from './services/work-queue.js';
+import type { TaskDispatcher } from './services/task-dispatcher.js';
 
 export interface ServerDeps {
   readonly objectiveService: ObjectiveService;
-  readonly taskService: TaskService;
-  readonly workQueue: WorkQueue;
+  /** Atomically creates a task and enqueues its work order (§4.2/§5). */
+  readonly taskDispatcher: TaskDispatcher;
 }
 
 interface CreateObjectiveBody {
@@ -147,25 +146,25 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.code(202).send({ status: 'approval_required', reason: decision.reason });
     }
 
-    const task = await deps.taskService.create(
-      { objectiveId: id as ObjectiveId, goal: body.goal, definitionOfDone: body.definitionOfDone },
+    // The dispatcher creates the task, writes `task.created`, and enqueues the
+    // work order — atomically in the Drizzle path (§4.2/§5).
+    const { task, jobId } = await deps.taskDispatcher.dispatch(
+      {
+        objectiveId: id as ObjectiveId,
+        goal: body.goal,
+        definitionOfDone: body.definitionOfDone,
+        requiredCapabilities,
+        ...(body.prefersHuman !== undefined ? { prefersHuman: body.prefersHuman } : {}),
+        ...(body.needsReasoning !== undefined ? { needsReasoning: body.needsReasoning } : {}),
+        ...(body.reasoningTier !== undefined ? { reasoningTier: body.reasoningTier } : {}),
+        ...(body.needsTools !== undefined ? { needsTools: body.needsTools } : {}),
+        ...(body.needsVision !== undefined ? { needsVision: body.needsVision } : {}),
+        ...(body.requireLocal !== undefined ? { requireLocal: body.requireLocal } : {}),
+        ...(body.minContextTokens !== undefined ? { minContextTokens: body.minContextTokens } : {}),
+        ...(body.modelRequest !== undefined ? { modelRequest: body.modelRequest } : {}),
+      },
       principal,
     );
-
-    const order: WorkOrder = {
-      organizationId: principal.organizationId,
-      taskId: task.id,
-      requiredCapabilities,
-      ...(body.prefersHuman !== undefined ? { prefersHuman: body.prefersHuman } : {}),
-      ...(body.needsReasoning !== undefined ? { needsReasoning: body.needsReasoning } : {}),
-      ...(body.reasoningTier !== undefined ? { reasoningTier: body.reasoningTier } : {}),
-      ...(body.needsTools !== undefined ? { needsTools: body.needsTools } : {}),
-      ...(body.needsVision !== undefined ? { needsVision: body.needsVision } : {}),
-      ...(body.requireLocal !== undefined ? { requireLocal: body.requireLocal } : {}),
-      ...(body.minContextTokens !== undefined ? { minContextTokens: body.minContextTokens } : {}),
-      ...(body.modelRequest !== undefined ? { modelRequest: body.modelRequest } : {}),
-    };
-    const { jobId } = await deps.workQueue.enqueue(order);
 
     return reply.code(202).send({ status: 'queued', task, jobId });
   });
