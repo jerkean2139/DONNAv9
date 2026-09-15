@@ -81,31 +81,31 @@ Human input
 
 ### 1.3 Key architectural properties
 
-- **Orchestrator owns durable state; LLMs are advisory.** The LLM produces *proposals* (intent classification, plans, action drafts, memory-write suggestions). The orchestrator, policy engine, and Postgres own the authoritative transitions, retries, budgets and safety. This is the concrete meaning of "Donna is not an LLM."
+- **Orchestrator owns durable state; LLMs are advisory.** The LLM produces _proposals_ (intent classification, plans, action drafts, memory-write suggestions). The orchestrator, policy engine, and Postgres own the authoritative transitions, retries, budgets and safety. This is the concrete meaning of "Donna is not an LLM."
 - **Event-driven UI.** The web experience never polls arbitrary state; it subscribes to the shared event/task model. Every panel (Rail, Workspace, approvals) is a projection of events.
 - **Provider independence by construction.** No feature module imports a provider SDK directly. All provider access flows through adapter packages that satisfy a stable contract (§7).
 - **Degrade, don't fail.** Every external dependency has a defined timeout → bounded retry → alternate adapter/model/node → degraded state → alert path (doc 14). Losing a model, a memory engine, or all local nodes degrades scope, never core availability.
 
 ### 1.4 Recommended technology stack **[DECISION]**
 
-| Concern | Recommendation | Rationale / alternatives |
-|---|---|---|
-| Language | **TypeScript** end-to-end | One language across control plane, adapters, workers, web; matches legacy `.ts/.tsx` reuse candidates; strong typing for domain state machines. |
-| Repo layout | **pnpm workspaces + Turborepo monorepo** | Clean package boundaries enforce the layer separation; shared domain types; fast incremental builds. |
-| API/control-plane runtime | **Node + Fastify** (long-running service) | Lightweight, first-class TypeScript, good for a service that also hosts SSE/WS. Alt: NestJS if we want batteries-included DI. |
-| Durable state / DB | **Postgres (Supabase)** with **Drizzle ORM** | Postgres is the mandated authoritative store; Drizzle gives typed SQL + reversible SQL migrations. Alt: Prisma. |
-| Durable jobs/queue | **graphile-worker** (Postgres-native) as default; **Temporal** flagged as the upgrade path | Postgres-native queue means *transactional enqueue* (job + state change commit together = no lost work), minimal infra. Temporal is the gold standard for long checkpointed workflows if/when scale demands it. See §5. |
-| Real-time to UI | **Server-Sent Events / WebSocket gateway** fed by the event bus (Postgres `LISTEN/NOTIFY` or Supabase Realtime) | Matches event-driven UI; avoids polling. |
-| Vector/semantic memory | **pgvector in the same Postgres** behind a Memory adapter | Keeps memory as an *index* over authoritative state, not a separate source of truth. Adapter allows swapping to a dedicated vector DB later. |
-| Auth | **Supabase Auth** (or Auth.js) with **MFA** + server-side session/policy validation | MFA is mandatory (doc 06/10). Individual accounts, no shared logins. |
-| Web app | **React + Vite + TypeScript + Tailwind + shadcn/ui** | Command-first SPA shell, independent of the backend (desktop-shell-ready). Alt: Next.js if SSR wanted. |
-| Local node agent | **Small Node/TS service** exposing OpenAI-compatible inference (Ollama/vLLM behind it) + heartbeat | Node contract in doc 09/11. |
-| Private networking | **Tailscale-style mesh** (WireGuard) | No public inference/RDP ports (V2-020). |
-| Secrets | **Dedicated secrets manager** (Supabase Vault / Doppler / cloud KMS) | Never in memory/logs/source (doc 10). |
-| Observability | **OpenTelemetry** traces/metrics/logs + Donna Health dashboard | Doc 14. |
-| Hosting | Control plane + workers on a **container host that supports long-running processes** (Fly.io / Railway / VPS); DB on Supabase; web on Vercel/Netlify or same host | Durable workers are **not** serverless-friendly. Flagged in §22. |
+| Concern                   | Recommendation                                                                                                                                                    | Rationale / alternatives                                                                                                                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language                  | **TypeScript** end-to-end                                                                                                                                         | One language across control plane, adapters, workers, web; matches legacy `.ts/.tsx` reuse candidates; strong typing for domain state machines.                                                                         |
+| Repo layout               | **pnpm workspaces + Turborepo monorepo**                                                                                                                          | Clean package boundaries enforce the layer separation; shared domain types; fast incremental builds.                                                                                                                    |
+| API/control-plane runtime | **Node + Fastify** (long-running service)                                                                                                                         | Lightweight, first-class TypeScript, good for a service that also hosts SSE/WS. Alt: NestJS if we want batteries-included DI.                                                                                           |
+| Durable state / DB        | **Postgres (Supabase)** with **Drizzle ORM**                                                                                                                      | Postgres is the mandated authoritative store; Drizzle gives typed SQL + reversible SQL migrations. Alt: Prisma.                                                                                                         |
+| Durable jobs/queue        | **graphile-worker** (Postgres-native) as default; **Temporal** flagged as the upgrade path                                                                        | Postgres-native queue means _transactional enqueue_ (job + state change commit together = no lost work), minimal infra. Temporal is the gold standard for long checkpointed workflows if/when scale demands it. See §5. |
+| Real-time to UI           | **Server-Sent Events / WebSocket gateway** fed by the event bus (Postgres `LISTEN/NOTIFY` or Supabase Realtime)                                                   | Matches event-driven UI; avoids polling.                                                                                                                                                                                |
+| Vector/semantic memory    | **pgvector in the same Postgres** behind a Memory adapter                                                                                                         | Keeps memory as an _index_ over authoritative state, not a separate source of truth. Adapter allows swapping to a dedicated vector DB later.                                                                            |
+| Auth                      | **Supabase Auth** (or Auth.js) with **MFA** + server-side session/policy validation                                                                               | MFA is mandatory (doc 06/10). Individual accounts, no shared logins.                                                                                                                                                    |
+| Web app                   | **React + Vite + TypeScript + Tailwind + shadcn/ui**                                                                                                              | Command-first SPA shell, independent of the backend (desktop-shell-ready). Alt: Next.js if SSR wanted.                                                                                                                  |
+| Local node agent          | **Small Node/TS service** exposing OpenAI-compatible inference (Ollama/vLLM behind it) + heartbeat                                                                | Node contract in doc 09/11.                                                                                                                                                                                             |
+| Private networking        | **Tailscale-style mesh** (WireGuard)                                                                                                                              | No public inference/RDP ports (V2-020).                                                                                                                                                                                 |
+| Secrets                   | **Dedicated secrets manager** (Supabase Vault / Doppler / cloud KMS)                                                                                              | Never in memory/logs/source (doc 10).                                                                                                                                                                                   |
+| Observability             | **OpenTelemetry** traces/metrics/logs + Donna Health dashboard                                                                                                    | Doc 14.                                                                                                                                                                                                                 |
+| Hosting                   | Control plane + workers on a **container host that supports long-running processes** (Fly.io / Railway / VPS); DB on Supabase; web on Vercel/Netlify or same host | Durable workers are **not** serverless-friendly. Flagged in §22.                                                                                                                                                        |
 
-> **Why not serverless-first:** durable workers hold leases and heartbeats and run long jobs; they need persistent processes. The web app and stateless read APIs *can* be serverless, but the orchestrator/worker tier must run on always-on containers.
+> **Why not serverless-first:** durable workers hold leases and heartbeats and run long jobs; they need persistent processes. The web app and stateless read APIs _can_ be serverless, but the orchestrator/worker tier must run on always-on containers.
 
 ---
 
@@ -167,6 +167,7 @@ DONNAv9/
 ```
 
 **Boundary rules enforced in CI:**
+
 - Feature packages may **not** import provider SDKs; only `packages/adapters/*` may.
 - `apps/web` may **not** import `db` or `policy` directly; it talks to the control-plane API.
 - `core-domain` has **zero** runtime dependencies (pure domain logic, unit-testable).
@@ -190,6 +191,7 @@ Organization, User, Team, Membership, Role, Permission, Person, Company, Client,
 ### 3.3 Selected table shapes (the load-bearing ones)
 
 **objective**
+
 ```
 id, organization_id, scope, scope_ref, requester_id, owner_id,
 requested_outcome, definition_of_done, priority, risk_level,
@@ -198,6 +200,7 @@ created_at, updated_at
 ```
 
 **task** (the durable unit of execution)
+
 ```
 id, organization_id, objective_id, parent_task_id,
 goal, definition_of_done, status(enum: pending|planned|assigned|
@@ -213,6 +216,7 @@ artifacts[], created_at, updated_at
 ```
 
 **event** (append-only execution history — the audit + recovery + UI feed)
+
 ```
 id, organization_id, objective_id, task_id, type(enum),
 actor(type: human|orchestrator|adapter|checker + id),
@@ -222,7 +226,7 @@ correlation_id, causation_id, created_at
 
 **delegation** — objective/task, delegator, owner, priority, DoD, due, dependencies, provided_resources, **authority_boundary**, escalation_rules, status.
 
-**approval** — requester, proposed_action, target_resources, **exact_scope**, risk, reason, preview_diff_ref, expires_at, approver_id, decision, decided_at, audit refs. *Material scope change invalidates the approval.*
+**approval** — requester, proposed_action, target_resources, **exact_scope**, risk, reason, preview_diff_ref, expires_at, approver_id, decision, decided_at, audit refs. _Material scope change invalidates the approval._
 
 **artifact / source** — provenance: creator, requester, objective/task, models/tools used, source_refs, timestamps, version, checker, approval, destination; **source_confidence: `AUTHORITATIVE | PRIMARY | DERIVED | INFERRED | UNVERIFIED`**.
 
@@ -238,11 +242,11 @@ correlation_id, causation_id, created_at
 
 - Every record supports retention policy, legal/business hold, and a `deletion_state`.
 - **Deleting a source triggers cascade invalidation** of derived embeddings/indexes/memory. Soft delete is not a substitute for policy-compliant removal.
-- Secrets are **never** columns in these tables; only secret *references* to the secrets manager.
+- Secrets are **never** columns in these tables; only secret _references_ to the secrets manager.
 
 ### 3.5 Greenfield note
 
-There is no existing schema to migrate *into* — this is a fresh schema designed from V2 boundaries (doc 18). Legacy schemas (e.g. `011_donna_evaluation_scores.sql`) are **reference only** for the later legacy-audit phase (§21), never the base shape.
+There is no existing schema to migrate _into_ — this is a fresh schema designed from V2 boundaries (doc 18). Legacy schemas (e.g. `011_donna_evaluation_scores.sql`) are **reference only** for the later legacy-audit phase (§21), never the base shape.
 
 ---
 
@@ -250,14 +254,14 @@ There is no existing schema to migrate *into* — this is a fresh schema designe
 
 ### 4.1 Services / deployables
 
-| Deployable | Responsibility | Scaling |
-|---|---|---|
-| **control-plane API** (`apps/control-plane`) | Authn/authz, intent, objective/plan CRUD, Work Router entry, approvals, event stream (SSE/WS), read projections | horizontal, stateless |
-| **worker runtime** (`apps/worker`) | Claims tasks (lease+heartbeat), runs adapters, checkpoints, emits events, runs checker, respects budgets | horizontal, stateful leases |
-| **node-agent** (`apps/node-agent`) | Runs on Dell/Omen; heartbeat + resource telemetry; local OpenAI-compatible inference proxy over mesh | one per machine |
-| **web** (`apps/web`) | Command experience; pure client of the API + event stream | CDN/edge |
+| Deployable                                   | Responsibility                                                                                                  | Scaling                     |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **control-plane API** (`apps/control-plane`) | Authn/authz, intent, objective/plan CRUD, Work Router entry, approvals, event stream (SSE/WS), read projections | horizontal, stateless       |
+| **worker runtime** (`apps/worker`)           | Claims tasks (lease+heartbeat), runs adapters, checkpoints, emits events, runs checker, respects budgets        | horizontal, stateful leases |
+| **node-agent** (`apps/node-agent`)           | Runs on Dell/Omen; heartbeat + resource telemetry; local OpenAI-compatible inference proxy over mesh            | one per machine             |
+| **web** (`apps/web`)                         | Command experience; pure client of the API + event stream                                                       | CDN/edge                    |
 
-The orchestrator logic lives in `packages/` and is *hosted* by the API (for synchronous planning/routing) and the worker (for execution). This keeps domain logic transport-independent.
+The orchestrator logic lives in `packages/` and is _hosted_ by the API (for synchronous planning/routing) and the worker (for execution). This keeps domain logic transport-independent.
 
 ### 4.2 Event types (doc 02) + envelope
 
@@ -278,7 +282,7 @@ Directly satisfies V2-021 and doc 04/14/16 ("Objectives survive browser closure;
 ### 5.1 Mechanism (default: Postgres-native)
 
 - **Durable state = the `task` table itself.** Tasks are not ephemeral queue messages; they are rows with a full lifecycle state machine (§3.3).
-- **Dispatch = graphile-worker** (Postgres-backed). Because enqueue happens in the *same transaction* as the state write, work is never lost on crash.
+- **Dispatch = graphile-worker** (Postgres-backed). Because enqueue happens in the _same transaction_ as the state write, work is never lost on crash.
 - **Leases + heartbeats:** a worker claims a task by setting `lease_owner` + `lease_expires_at` and periodically bumps `heartbeat_at`. If the lease expires (worker died), the task is **safely reclaimable** by another worker.
 - **Checkpoints:** long jobs persist progress into `task.checkpoint` (jsonb) so a resumed task continues rather than restarts.
 - **Idempotency:** every side-effecting task carries an `idempotency_key`. Adapters that touch the outside world (email, CRM, posts, deploys, charges) **must** honor it, so retries never duplicate (doc 04).
@@ -286,7 +290,7 @@ Directly satisfies V2-021 and doc 04/14/16 ("Objectives survive browser closure;
 
 ### 5.2 Upgrade path **[DECISION]**
 
-If workflow complexity or scale outgrows the Postgres queue, migrate the *dispatch/checkpoint* layer to **Temporal** without changing the domain model — the Objective/Task/Event tables remain the record; Temporal would own the execution timeline. Recommend **starting with graphile-worker** (minimal infra, one dependency) and keeping Temporal as a documented, non-blocking option.
+If workflow complexity or scale outgrows the Postgres queue, migrate the _dispatch/checkpoint_ layer to **Temporal** without changing the domain model — the Objective/Task/Event tables remain the record; Temporal would own the execution timeline. Recommend **starting with graphile-worker** (minimal infra, one dependency) and keeping Temporal as a documented, non-blocking option.
 
 ---
 
@@ -300,13 +304,13 @@ Every request is evaluated against: **authenticated identity → organization �
 
 ### 6.2 Authority levels
 
-| Level | Name | Meaning |
-|---|---|---|
-| 0 | **Observe** | read-only |
-| 1 | **Prepare** | research / draft / analyze / propose changes |
-| 2 | **Routine Action** | explicitly approved repeatable actions within bounded policy |
-| 3 | **Approval Required** | money, contracts, pricing, production deploys, client-facing outbound comms, destructive data changes, security/permission changes |
-| 4 | **Never Autonomous** | org-defined actions that always require direct human execution |
+| Level | Name                  | Meaning                                                                                                                            |
+| ----- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | **Observe**           | read-only                                                                                                                          |
+| 1     | **Prepare**           | research / draft / analyze / propose changes                                                                                       |
+| 2     | **Routine Action**    | explicitly approved repeatable actions within bounded policy                                                                       |
+| 3     | **Approval Required** | money, contracts, pricing, production deploys, client-facing outbound comms, destructive data changes, security/permission changes |
+| 4     | **Never Autonomous**  | org-defined actions that always require direct human execution                                                                     |
 
 Execution authority = **intersection** of user role ∩ resource permissions ∩ skill policy ∩ current approval state. A skill can never grant itself authority (doc 13).
 
@@ -360,7 +364,7 @@ Nodes expose **authenticated, private** health/capability/inference endpoints (O
 
 ### 7.5 Provider-independence obligation
 
-For each core capability, tests/docs must answer: *"If this provider disappeared tomorrow, which adapter replaces it and what degrades?"* No model/memory/browser vendor may become irreplaceable (V2-026, §16).
+For each core capability, tests/docs must answer: _"If this provider disappeared tomorrow, which adapter replaces it and what degrades?"_ No model/memory/browser vendor may become irreplaceable (V2-026, §16).
 
 ---
 
@@ -385,7 +389,7 @@ Doc 11, V2-016..V2-020.
 
 - **Cloud control plane + authoritative state are always available.** Local machines are **compute workers, never authoritative servers** and never sole storage.
 - **Nodes & modes:**
-  - **Dell XPS 8960** (i7-14700, 64GB, RTX 3050-class, Win 11 Pro) — intended **always-on `AUTO`** node. *Verify actual VRAM/driver telemetry at deployment* (V2-017).
+  - **Dell XPS 8960** (i7-14700, 64GB, RTX 3050-class, Win 11 Pro) — intended **always-on `AUTO`** node. _Verify actual VRAM/driver telemetry at deployment_ (V2-017).
   - **HP Omen 16** (i7-14650HX, 64GB, RTX 4060 laptop, Win 11) — optional travel node with **`AUTO / OFF / LOCAL_ONLY`**.
   - `AUTO`: may receive work when online/healthy and policy allows. `OFF`: no new jobs, drain per policy. `LOCAL_ONLY`: owner uses the machine, company router cannot dispatch to it.
 - **Heartbeat/health:** authenticated heartbeat with status, models/capabilities, CPU/RAM/GPU util, free VRAM, temp, power/battery, current jobs. **Missing heartbeat auto-removes the node from routing.**
@@ -405,7 +409,7 @@ Doc 04/12. **Invoked only after the Work Router decides AI is the right executio
 - **Local-first candidates:** classification, extraction, embeddings, reranking, lead scoring, transcript chunking/summarization, memory compression, tagging, dedupe, simple drafting, structured transforms — **when local quality is adequate**.
 - **Model pool:** Anthropic API, OpenAI API (approved reasoning/frontier models), local Dell/Omen models, future providers — all behind adapters. **Model names + pricing are configuration data (`packages/config`), not hard-coded architecture.**
 - **Fallback/escalation:** every route has an ordered fallback chain; an outage or offline node must not strand core functionality.
-- **Shadow transition:** preserve the current Claude-quality baseline; run cheaper/local alternatives in **shadow evaluation**; only shift a workload downward when the cheaper route **consistently meets the acceptance threshold**. Retain frontier APIs for hard/high-risk work. *Cheaper is never accepted merely because it is cheaper.*
+- **Shadow transition:** preserve the current Claude-quality baseline; run cheaper/local alternatives in **shadow evaluation**; only shift a workload downward when the cheaper route **consistently meets the acceptance threshold**. Retain frontier APIs for hard/high-risk work. _Cheaper is never accepted merely because it is cheaper._
 
 ---
 
@@ -433,7 +437,7 @@ Doc 05, V2-005/V2-011. **Four distinct systems — kept separate on purpose.**
 - **Context budgeting:** the Context Builder ranks and selects (identity/role, current objective, authoritative state, relevant project facts, retrieved knowledge/memory, required skill/SOP, recent meaningful events, only necessary tool defs) under a **per-task token budget**, and records what was included. Never send entire company history by default.
 - **Cache tiers:** `STATIC` (constitution, policies, role defs, stable tool schemas, approved SOPs) / `SEMI-STABLE` (project/client context) / `DYNAMIC` (current request, fresh events, live data). Arrange provider prompts to maximize safe cache reuse **without** letting stale dynamic data read as current.
 - **Source confidence** preserved end to end: `AUTHORITATIVE | PRIMARY | DERIVED | INFERRED | UNVERIFIED`. A database fact is never conflated with an AI inference.
-- **Write policy:** models *propose* memory writes; **policy decides** what becomes durable. High-impact decisions and SOP/policy changes require explicit validation/approval. **Prompt-injected external content can never rewrite policy or memory authority** (doc 05/10).
+- **Write policy:** models _propose_ memory writes; **policy decides** what becomes durable. High-impact decisions and SOP/policy changes require explicit validation/approval. **Prompt-injected external content can never rewrite policy or memory authority** (doc 05/10).
 - **Deletion:** removing/expiring a source triggers cleanup/invalidation of associated embeddings, indexes, derived memory (retention policy).
 - **Secrets** never enter semantic memory or prompt history beyond strictly required secure execution boundaries.
 
@@ -512,31 +516,31 @@ Doc 14, V2-024.
 
 ## 18. Implementation phases (greenfield-adapted)
 
-Adapted from doc 15. Doc 15's "audit the existing repo" (Rule Zero) becomes, per doc 18, **greenfield scaffolding + a *separate, later* legacy-audit pass** (§21) — the legacy repos are reference material, not the base.
+Adapted from doc 15. Doc 15's "audit the existing repo" (Rule Zero) becomes, per doc 18, **greenfield scaffolding + a _separate, later_ legacy-audit pass** (§21) — the legacy repos are reference material, not the base.
 
 Each phase must state: user-visible outcome · reused code · files changed/added · schema/migrations · APIs/adapters · permissions/security · tests · acceptance criteria · risks · rollback/recovery · dependencies. **Approval gates precede irreversible or architecture-changing work.**
 
-| Phase | Name | Outcome |
-|---|---|---|
-| **0** | **Foundation scaffolding** | Monorepo, tooling, CI boundary rules, `core-domain` types/state machines, dev docker Postgres+pgvector, env/secret conventions, ADR log. *(No product behavior yet.)* |
-| **1** | **Control-plane foundation** | Organization/identity/scopes; Objective/Task/Event model; durable queue + transactional outbox; audit; idempotency; feature flags. Minimal UI. |
-| **2** | **Donna command experience** | Persistent command bar, Active Workspace, Donna Rail, context nav, task/objective visibility, approvals UI. |
-| **3** | **Work Router + adapter foundation** | Capability registry, stable adapter contracts, deterministic vs human vs AI routing, health/fallback normalization. |
-| **4** | **Model Router + cost/context** | Anthropic/OpenAI adapters, Context Packets, caching, budgets/cost ledger, quality telemetry, reasoning/escalation policy. |
-| **5** | **Local compute** | Dell node first (mesh, service identity, heartbeat, local endpoint, auto API fallback); then Omen with `AUTO/OFF/LOCAL_ONLY` + resource-aware routing. |
-| **6** | **Memory / knowledge** | Authoritative-state separation, ingestion/provenance, semantic memory adapter, scopes, retention/deletion. |
-| **7** | **Team Donna** | Personalized role contexts, delegation contracts, human availability, private/team/project/org scopes. |
-| **8** | **Skill Registry** | Versioned skills, SOP promotion workflow, checker/fallback/permission rules. |
-| **9** | **Capability expansion** | Browser/research, GitHub/coding, Fathom/Slack/Drive/Gmail/GHL, Lead Builder, more tools. |
-| **10** | **Desktop / voice / screen** | Tauri shell, push-to-talk, explicit screen context, detachable multi-monitor workspaces. |
-| **11** | **Optimization** | Shadow model evaluation, empirical routing, cost reduction, reliability hardening, optional rented-GPU burst. |
+| Phase  | Name                                 | Outcome                                                                                                                                                               |
+| ------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0**  | **Foundation scaffolding**           | Monorepo, tooling, CI boundary rules, `core-domain` types/state machines, dev docker Postgres+pgvector, env/secret conventions, ADR log. _(No product behavior yet.)_ |
+| **1**  | **Control-plane foundation**         | Organization/identity/scopes; Objective/Task/Event model; durable queue + transactional outbox; audit; idempotency; feature flags. Minimal UI.                        |
+| **2**  | **Donna command experience**         | Persistent command bar, Active Workspace, Donna Rail, context nav, task/objective visibility, approvals UI.                                                           |
+| **3**  | **Work Router + adapter foundation** | Capability registry, stable adapter contracts, deterministic vs human vs AI routing, health/fallback normalization.                                                   |
+| **4**  | **Model Router + cost/context**      | Anthropic/OpenAI adapters, Context Packets, caching, budgets/cost ledger, quality telemetry, reasoning/escalation policy.                                             |
+| **5**  | **Local compute**                    | Dell node first (mesh, service identity, heartbeat, local endpoint, auto API fallback); then Omen with `AUTO/OFF/LOCAL_ONLY` + resource-aware routing.                |
+| **6**  | **Memory / knowledge**               | Authoritative-state separation, ingestion/provenance, semantic memory adapter, scopes, retention/deletion.                                                            |
+| **7**  | **Team Donna**                       | Personalized role contexts, delegation contracts, human availability, private/team/project/org scopes.                                                                |
+| **8**  | **Skill Registry**                   | Versioned skills, SOP promotion workflow, checker/fallback/permission rules.                                                                                          |
+| **9**  | **Capability expansion**             | Browser/research, GitHub/coding, Fathom/Slack/Drive/Gmail/GHL, Lead Builder, more tools.                                                                              |
+| **10** | **Desktop / voice / screen**         | Tauri shell, push-to-talk, explicit screen context, detachable multi-monitor workspaces.                                                                              |
+| **11** | **Optimization**                     | Shadow model evaluation, empirical routing, cost reduction, reliability hardening, optional rented-GPU burst.                                                         |
 
 ---
 
 ## 19. Skills & SOPs (doc 13)
 
 - Reusable capability = a **versioned Skill**, not a prompt. Fields: id/name/version/owner, purpose, trigger/eligibility, inputs, required context, required capabilities, ordered steps/work graph, tools/adapters, permissions, approval rules, DoD, checker/validation, fallback/escalation, cost class/budget, outputs/artifacts, memory-write rules, supported roles/teams, status(draft|approved|deprecated).
-- **SOP promotion lifecycle:** observed pattern → Donna proposes *Draft Skill* → human review/edit → approved version → assigned availability → measured execution → version/deprecation. **Donna never silently turns observed behavior into binding policy.**
+- **SOP promotion lifecycle:** observed pattern → Donna proposes _Draft Skill_ → human review/edit → approved version → assigned availability → measured execution → version/deprecation. **Donna never silently turns observed behavior into binding policy.**
 - **Versioning:** executions retain their SkillVersion; material change = new version; rollback possible; architecture/policy-affecting changes also recorded in the Decisions Log.
 - **Portability:** skills reference **abstract capabilities/adapters**, not hard-coded models/tools.
 
@@ -554,13 +558,13 @@ Per doc 18, legacy repos (`gdvansky/KOBTEAMLLM`, `jerkean2139/Kob-command-center
 
 Provisional candidates observed (names only — **not yet inspected**, classifications are hypotheses to test during the audit):
 
-| Candidate (observed) | Provisional class | Notes to verify during audit |
-|---|---|---|
-| `donna-intelligence.ts` / `donna-ai-engine.ts` | **REFERENCE** | Likely V1 model-call logic that conflates orchestration + model use; V2 splits these across Work Router / Model Router / adapters. Study for domain insight, do not port wholesale. |
-| `donna-memory.ts` (+ `donna-memory` folder, `.routes.ts`) | **REUSE CANDIDATE** | Only if it cleanly maps to the V2 Memory adapter + provenance/confidence/scope model and never acts as authoritative store. |
-| `donna-evaluation.ts` / `011_donna_evaluation_scores.sql` | **REUSE CANDIDATE** | Evaluation scoring may inform `ModelEvaluation`; re-shape to V2 schema, don't inherit table shape. |
-| UI: `donna-chat-flyout.tsx`, `donna-voice-mode.tsx`, `donna-avatar.tsx`, `donna-typing-indicator.tsx`, `donna-proactive.tsx`, `donna-analysis.tsx` | **REFERENCE** | Command-first V2 UX differs from a chat flyout; salvage components selectively, not the layout. |
-| V1 directory structure / orchestration / permission semantics | **DISCARD** as a base | Doc 18: no inherited architecture/structure by default. |
+| Candidate (observed)                                                                                                                               | Provisional class     | Notes to verify during audit                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `donna-intelligence.ts` / `donna-ai-engine.ts`                                                                                                     | **REFERENCE**         | Likely V1 model-call logic that conflates orchestration + model use; V2 splits these across Work Router / Model Router / adapters. Study for domain insight, do not port wholesale. |
+| `donna-memory.ts` (+ `donna-memory` folder, `.routes.ts`)                                                                                          | **REUSE CANDIDATE**   | Only if it cleanly maps to the V2 Memory adapter + provenance/confidence/scope model and never acts as authoritative store.                                                         |
+| `donna-evaluation.ts` / `011_donna_evaluation_scores.sql`                                                                                          | **REUSE CANDIDATE**   | Evaluation scoring may inform `ModelEvaluation`; re-shape to V2 schema, don't inherit table shape.                                                                                  |
+| UI: `donna-chat-flyout.tsx`, `donna-voice-mode.tsx`, `donna-avatar.tsx`, `donna-typing-indicator.tsx`, `donna-proactive.tsx`, `donna-analysis.tsx` | **REFERENCE**         | Command-first V2 UX differs from a chat flyout; salvage components selectively, not the layout.                                                                                     |
+| V1 directory structure / orchestration / permission semantics                                                                                      | **DISCARD** as a base | Doc 18: no inherited architecture/structure by default.                                                                                                                             |
 
 **Rule:** to reach the codebase, a legacy component needs a concrete V2 need, a documented behavior/test/license/security review, a bounded scope, and (if it changes architecture/risk) approval + a Decisions-Log entry.
 
@@ -570,12 +574,12 @@ Provisional candidates observed (names only — **not yet inspected**, classific
 
 These are the points where the Bible left a choice open or where my recommendation should be confirmed before Phase 0:
 
-1. **Hosting for the always-on tier** — Fly.io vs Railway vs a VPS for control-plane API + workers? (Durable workers rule out pure serverless.) *Recommendation: Fly.io or Railway to start.*
-2. **Durable-job engine** — start with **graphile-worker** (Postgres-native, minimal infra) and keep **Temporal** as a documented upgrade, or invest in Temporal from day one? *Recommendation: graphile-worker first.*
-3. **Auth provider** — Supabase Auth vs Auth.js vs Clerk (all support MFA)? *Recommendation: Supabase Auth to stay in one platform.*
-4. **ORM** — Drizzle vs Prisma? *Recommendation: Drizzle (SQL-first, reversible migrations, lighter).*
-5. **Postgres RLS** — enable as defense-in-depth alongside the app-layer policy engine? *Recommendation: yes.*
-6. **Web framework** — React+Vite SPA vs Next.js? *Recommendation: React+Vite SPA (backend-independent, desktop-shell-ready).*
+1. **Hosting for the always-on tier** — Fly.io vs Railway vs a VPS for control-plane API + workers? (Durable workers rule out pure serverless.) _Recommendation: Fly.io or Railway to start._
+2. **Durable-job engine** — start with **graphile-worker** (Postgres-native, minimal infra) and keep **Temporal** as a documented upgrade, or invest in Temporal from day one? _Recommendation: graphile-worker first._
+3. **Auth provider** — Supabase Auth vs Auth.js vs Clerk (all support MFA)? _Recommendation: Supabase Auth to stay in one platform._
+4. **ORM** — Drizzle vs Prisma? _Recommendation: Drizzle (SQL-first, reversible migrations, lighter)._
+5. **Postgres RLS** — enable as defense-in-depth alongside the app-layer policy engine? _Recommendation: yes._
+6. **Web framework** — React+Vite SPA vs Next.js? _Recommendation: React+Vite SPA (backend-independent, desktop-shell-ready)._
 7. **Model pool & pricing config** — which exact Anthropic/OpenAI models are approved for the pool, and starting budget defaults per org/project/user? (Names/pricing are config, but need seed values.)
 8. **Retention & DR targets** — concrete retention windows (chats, transcripts, screenshots, embeddings, logs, backups) and **RPO/RTO** targets.
 9. **Initial roles & authority mapping** — confirm the five roles and which actions sit at Authority Level 3 (approval) vs 4 (never autonomous) for KOB specifically.
@@ -596,4 +600,4 @@ On Jeremy's explicit approval of this plan, work begins at **Phase 0 (Foundation
 
 ---
 
-*Prepared from the DONNA Build Bible V2 (docs 00–18). This plan asserts no changes to production infrastructure, authentication/authorization, or data. It is a design proposal only.*
+_Prepared from the DONNA Build Bible V2 (docs 00–18). This plan asserts no changes to production infrastructure, authentication/authorization, or data. It is a design proposal only._
