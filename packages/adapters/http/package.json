@@ -1,0 +1,27 @@
+{
+  "name": "@donna/adapter-http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTP capability adapter — real outbound requests behind the CapabilityAdapter contract (the 'automation' execution class); SSRF-safe, bound to a fixed base URL.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@donna/adapter-base": "workspace:*"
+  }
+}
