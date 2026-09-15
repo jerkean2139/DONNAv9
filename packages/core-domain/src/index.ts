@@ -7,6 +7,7 @@
  */
 export * from './ids.js';
 export * from './scope.js';
+export * from './roles.js';
 export * from './source-confidence.js';
 export * from './authority.js';
 export * from './event.js';
