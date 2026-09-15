@@ -40,6 +40,14 @@ const memberHeaders = {
   'x-donna-teams': 'teamA',
 };
 
+// A principal in a different organization — used for tenant-isolation checks.
+const otherOrgHeaders = {
+  'x-donna-user-id': 'u9',
+  'x-donna-org-id': 'org2',
+  'x-donna-role': 'team_member',
+  'x-donna-actor-kind': 'agent',
+};
+
 describe('control-plane API', () => {
   it('reports health', async () => {
     const { app } = makeApp();
@@ -101,10 +109,40 @@ describe('control-plane API', () => {
     expect(res.json().error).toBe('scope_denied');
   });
 
-  it('returns 404 for a missing objective', async () => {
+  it('requires authentication to read an objective', async () => {
     const { app } = makeApp();
     const res = await app.inject({ method: 'GET', url: '/objectives/does-not-exist' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns 404 for a missing objective', async () => {
+    const { app } = makeApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/objectives/does-not-exist',
+      headers: memberHeaders,
+    });
     expect(res.statusCode).toBe(404);
+  });
+
+  it('does not leak an objective across the tenant boundary', async () => {
+    const ctx = makeApp();
+    const objectiveId = await createObjective(ctx.app);
+
+    // The owner (org1) can read it; a principal in org2 gets 404, not the row.
+    const own = await ctx.app.inject({
+      method: 'GET',
+      url: `/objectives/${objectiveId}`,
+      headers: memberHeaders,
+    });
+    expect(own.statusCode).toBe(200);
+
+    const cross = await ctx.app.inject({
+      method: 'GET',
+      url: `/objectives/${objectiveId}`,
+      headers: otherOrgHeaders,
+    });
+    expect(cross.statusCode).toBe(404);
   });
 
   it('dispatches a task: creates it, enqueues a work order, emits task.created', async () => {

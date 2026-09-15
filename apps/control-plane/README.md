@@ -67,12 +67,16 @@ The composition root (`main.ts`) picks the backing by `DATABASE_URL`:
 The event-envelope→row mapping is the one canonical `eventEnvelopeToRow` in
 `@donna/db`, shared with the worker's outbox bus.
 
-### Known gap
+## Tenant-scoped reads
 
-`GET`/dispatch reads (`objectiveService.get`) are not yet tenant-scoped — the
-domain `Objective` carries no organization id, so cross-org read isolation lands
-with tenant-scoped reads + production auth (plan §16 isolation tests). Writes use
-the principal's organization id.
+`objectiveService.get(id, organizationId)` is tenant-isolated: an objective owned
+by another organization reads as `null`, never crosses the boundary. `GET
+/objectives/:id` requires authentication (401 otherwise) and scopes to the
+principal's organization, so a valid principal in the wrong org gets `404`, not
+the row. The domain `Objective` carries no org id, so the in-memory store tracks
+tenancy alongside it, matching the Drizzle query's `WHERE organization_id = …`.
+(Production auth still replaces the dev header shim later; the scoping is
+independent of that.)
 
 ## Running
 
@@ -83,6 +87,22 @@ DATABASE_URL=postgres://… PORT=3000 pnpm --filter @donna/control-plane start
 PORT=3000 pnpm --filter @donna/control-plane start
 ```
 
-Unit tests drive the app via Fastify `inject` against the in-memory services
-(no open port, no database). The Drizzle services and the transactional
-`add_job` are integration-tested against a live database, not in unit CI.
+## Tests
+
+Unit tests drive the app via Fastify `inject` against the in-memory services (no
+open port, no database) and run in normal CI.
+
+The Drizzle services and the transactional `add_job` are covered by
+`persistence.integration.test.ts`, which runs the real services against a live
+Postgres. It is **skipped unless `TEST_DATABASE_URL` is set**, so unit CI stays
+green without a database; point it at a throwaway Postgres to run it (never
+production):
+
+```bash
+# with a local Postgres (e.g. infra/docker) reachable at $TEST_DATABASE_URL:
+TEST_DATABASE_URL=postgres://…/donna pnpm --filter @donna/control-plane test
+```
+
+The harness applies the Drizzle migrations and graphile-worker's schema itself,
+seeds throwaway tenancy rows per test, and asserts the outbox + transactional
+enqueue invariants (including atomic rollback and tenant-scoped reads).

@@ -22,7 +22,13 @@ export interface CreateObjectiveInput {
 
 export interface ObjectiveService {
   create(input: CreateObjectiveInput, principal: PrincipalContext): Promise<Objective>;
-  get(id: string): Promise<Objective | null>;
+  /**
+   * Fetch an objective by id, scoped to `organizationId`. Reads are
+   * tenant-isolated: an objective owned by another organization reads as `null`,
+   * never leaks across the tenant boundary (Build Bible: multi-tenant from the
+   * schema up).
+   */
+  get(id: string, organizationId: string): Promise<Objective | null>;
 }
 
 /**
@@ -32,7 +38,9 @@ export interface ObjectiveService {
  * route contract and event emission are identical.
  */
 export class InMemoryObjectiveService implements ObjectiveService {
-  private readonly store = new Map<string, Objective>();
+  // The domain Objective carries no org id, so track tenancy alongside it to
+  // enforce scoped reads the same way the Drizzle query does.
+  private readonly store = new Map<string, { objective: Objective; organizationId: string }>();
 
   constructor(private readonly bus: EventBus) {}
 
@@ -50,7 +58,7 @@ export class InMemoryObjectiveService implements ObjectiveService {
       riskLevel: input.riskLevel,
       ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
     };
-    this.store.set(id, objective);
+    this.store.set(id, { objective, organizationId: principal.organizationId });
 
     await this.bus.publish(
       createEvent({
@@ -67,7 +75,9 @@ export class InMemoryObjectiveService implements ObjectiveService {
     return objective;
   }
 
-  async get(id: string): Promise<Objective | null> {
-    return this.store.get(id) ?? null;
+  async get(id: string, organizationId: string): Promise<Objective | null> {
+    const entry = this.store.get(id);
+    if (entry === undefined || entry.organizationId !== organizationId) return null;
+    return entry.objective;
   }
 }
