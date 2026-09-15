@@ -13,7 +13,7 @@ DONNAv9/
 ├─ eslint.config.js  .prettierrc.json  .env.example
 │
 ├─ apps/                                 # (added from Phase 1+)
-│  ├─ web/            # Phase 2 — React command experience
+│  ├─ web/            # Phase 2 ✅ React command-first shell (Vite + Tailwind)
 │  ├─ control-plane/  # Phase 1 ✅ Fastify API skeleton (identity→policy→objective)
 │  ├─ worker/         # Phase 1 ✅ durable job runtime (graphile-worker) + outbox
 │  └─ node-agent/     # Phase 5 — Dell/Omen heartbeat + local inference
