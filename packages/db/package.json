@@ -17,7 +17,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -25,7 +26,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "db:generate": "pnpm run build && drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:deploy": "node dist/bin/migrate.js"
   },
   "dependencies": {
     "@donna/core-domain": "workspace:*",

@@ -1,12 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import type { PrincipalContext } from '@donna/policy';
-import { createDatabase, schema, type DonnaDatabase } from '@donna/db';
+import { createDatabase, runDrizzleMigrations, schema, type DonnaDatabase } from '@donna/db';
 import { runMigrations } from 'graphile-worker';
 import { sql } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
@@ -24,10 +21,6 @@ import { DrizzleProvisioningService } from './webhooks/provisioning.js';
  * throwaway Postgres (e.g. `infra/docker`). Never point it at production.
  */
 const TEST_DATABASE_URL = process.env['TEST_DATABASE_URL'];
-const migrationsFolder = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../packages/db/migrations',
-);
 
 /** Seed the tenancy rows the objective/task FKs require; returns a principal. */
 async function seedTenant(db: DonnaDatabase): Promise<PrincipalContext> {
@@ -54,8 +47,8 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
 
   beforeAll(async () => {
     await runMigrations({ connectionString: TEST_DATABASE_URL! });
+    await runDrizzleMigrations(TEST_DATABASE_URL!);
     db = createDatabase(TEST_DATABASE_URL!);
-    await migrate(db, { migrationsFolder });
   });
 
   afterAll(async () => {
