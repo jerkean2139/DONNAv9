@@ -1,0 +1,25 @@
+{
+  "name": "@donna/control-plane",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DONNA V2 control-plane API skeleton (Fastify): identity → policy → objective/task → event outbox.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@donna/core-domain": "workspace:*",
+    "@donna/events": "workspace:*",
+    "@donna/policy": "workspace:*",
+    "fastify": "^5.1.0"
+  }
+}
