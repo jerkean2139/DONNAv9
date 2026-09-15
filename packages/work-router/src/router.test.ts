@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CapabilityRegistry } from './registry.js';
-import { candidateClasses, routeWork } from './router.js';
+import { candidateCapabilities, candidateClasses, routeWork } from './router.js';
 
 function registry(caps: Parameters<CapabilityRegistry['register']>[0][]): CapabilityRegistry {
   const r = new CapabilityRegistry();
@@ -79,5 +79,41 @@ describe('candidateClasses', () => {
 
   it('deduplicates and keeps human as the final fallback', () => {
     expect(candidateClasses({ requiredCapabilities: ['none'] }, registry([]))).toEqual(['human']);
+  });
+});
+
+describe('candidateCapabilities', () => {
+  it('lists every healthy provider, least-complex class first', () => {
+    const r = registry([
+      { id: 'auto', executionClass: 'automation', provides: ['crm'], health: 'healthy' },
+      { id: 'code', executionClass: 'deterministic', provides: ['crm'], health: 'healthy' },
+    ]);
+    expect(candidateCapabilities({ requiredCapabilities: ['crm'] }, r).map((c) => c.id)).toEqual([
+      'code',
+      'auto',
+    ]);
+  });
+
+  it('excludes unhealthy providers', () => {
+    const r = registry([
+      { id: 'code', executionClass: 'deterministic', provides: ['crm'], health: 'offline' },
+      { id: 'auto', executionClass: 'automation', provides: ['crm'], health: 'healthy' },
+    ]);
+    expect(candidateCapabilities({ requiredCapabilities: ['crm'] }, r).map((c) => c.id)).toEqual([
+      'auto',
+    ]);
+  });
+
+  it('yields no candidates when the order prefers a human', () => {
+    const r = registry([
+      { id: 'code', executionClass: 'deterministic', provides: ['crm'], health: 'healthy' },
+    ]);
+    expect(candidateCapabilities({ requiredCapabilities: ['crm'], prefersHuman: true }, r)).toEqual(
+      [],
+    );
+  });
+
+  it('is empty when nothing matches', () => {
+    expect(candidateCapabilities({ requiredCapabilities: ['none'] }, registry([]))).toEqual([]);
   });
 });
