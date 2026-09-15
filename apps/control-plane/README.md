@@ -46,18 +46,43 @@ server-side session validation) lands in a later phase. The policy engine still
 makes every authorization decision; the shim only assembles the trusted
 principal a verified session would provide.
 
-## State is in-memory for now
+## State: durable with `DATABASE_URL`, in-memory without
 
-`InMemoryObjectiveService` and `InMemoryTaskService` back the skeleton and
-tests. The Drizzle-backed services — persisting the objective/task and enqueuing
-its event (and, for a dispatch, the work-order job) in the transactional outbox
-within one transaction — land with the DB wiring; the route contracts and
-emitted events are identical.
+The composition root (`main.ts`) picks the backing by `DATABASE_URL`:
+
+- **Durable** (`DATABASE_URL` set) — `DrizzleObjectiveService` and
+  `DrizzleTaskDispatcher` persist to Postgres. Each write is transactional:
+  - `create` inserts the objective **and** writes `objective.created` to the
+    event outbox (`dispatched_at = null`) in one transaction.
+  - `dispatch` inserts the task, writes `task.created`, **and** enqueues the
+    `execute-work-order` job — via graphile-worker's `add_job`, which
+    participates in the same transaction — so all three commit together or not
+    at all. The task id is the job key, so a retried dispatch replaces the
+    pending job rather than duplicating it. `runMigrations` runs at startup to
+    ensure graphile-worker's schema exists before the first `add_job`.
+- **In-memory** (no `DATABASE_URL`) — `InMemoryObjectiveService` /
+  `InMemoryTaskDispatcher` back local runs and the test suite. Not durable; the
+  route contracts and emitted events are identical.
+
+The event-envelope→row mapping is the one canonical `eventEnvelopeToRow` in
+`@donna/db`, shared with the worker's outbox bus.
+
+### Known gap
+
+`GET`/dispatch reads (`objectiveService.get`) are not yet tenant-scoped — the
+domain `Objective` carries no organization id, so cross-org read isolation lands
+with tenant-scoped reads + production auth (plan §16 isolation tests). Writes use
+the principal's organization id.
 
 ## Running
 
 ```bash
+# durable (uses the Railway Postgres):
+DATABASE_URL=postgres://… PORT=3000 pnpm --filter @donna/control-plane start
+# in-memory (no database):
 PORT=3000 pnpm --filter @donna/control-plane start
 ```
 
-Tests drive the app via Fastify `inject` (no open port, no database).
+Unit tests drive the app via Fastify `inject` against the in-memory services
+(no open port, no database). The Drizzle services and the transactional
+`add_job` are integration-tested against a live database, not in unit CI.

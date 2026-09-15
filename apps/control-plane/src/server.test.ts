@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildServer } from './server.js';
 import { InMemoryObjectiveService } from './services/objective-service.js';
+import { InMemoryTaskDispatcher } from './services/task-dispatcher.js';
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
 
@@ -15,8 +16,7 @@ function makeApp() {
   const workQueue = new InMemoryWorkQueue();
   const app = buildServer({
     objectiveService: new InMemoryObjectiveService(bus),
-    taskService: new InMemoryTaskService(bus),
-    workQueue,
+    taskDispatcher: new InMemoryTaskDispatcher(new InMemoryTaskService(bus), workQueue),
   });
   return { app, publishedTypes, workQueue };
 }

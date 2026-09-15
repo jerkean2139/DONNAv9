@@ -7,3 +7,4 @@
  */
 export * as schema from './schema/index.js';
 export { createDatabase, type DonnaDatabase } from './client.js';
+export { eventEnvelopeToRow, type EventInsert } from './events-mapper.js';

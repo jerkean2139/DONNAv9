@@ -18,9 +18,11 @@
   },
   "dependencies": {
     "@donna/core-domain": "workspace:*",
+    "@donna/db": "workspace:*",
     "@donna/events": "workspace:*",
     "@donna/orchestrator": "workspace:*",
     "@donna/policy": "workspace:*",
+    "drizzle-orm": "^0.36.4",
     "fastify": "^5.1.0",
     "graphile-worker": "^0.16.6"
   }

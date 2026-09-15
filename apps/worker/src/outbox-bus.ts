@@ -1,32 +1,14 @@
 import type { EventEnvelope } from '@donna/core-domain';
-import { schema, type DonnaDatabase } from '@donna/db';
+import { eventEnvelopeToRow, schema, type DonnaDatabase } from '@donna/db';
 import type { EventBus, Unsubscribe } from '@donna/events';
 
-/** Insert shape for a persisted outbox event (dispatched_at left null). */
-type EventInsert = typeof schema.events.$inferInsert;
-
 /**
- * Map a domain {@link EventEnvelope} to an `events` insert row, leaving
- * `dispatchedAt` null so the dispatcher picks it up. Pure and dependency-light
- * (the inferred type is compile-time only) so it can be unit-tested without a
- * database. Mirrors {@link rowToEnvelope} in the opposite direction.
+ * Map a domain {@link EventEnvelope} to an `events` insert row. Re-exported from
+ * `@donna/db` — the schema-owning package holds the one canonical mapping (the
+ * write half of the transactional outbox), shared with the control-plane's
+ * Drizzle services. Kept under this name for the outbox bus and its tests.
  */
-export function envelopeToInsert(event: EventEnvelope): EventInsert {
-  return {
-    id: event.id,
-    type: event.type,
-    organizationId: event.organizationId,
-    objectiveId: event.objectiveId ?? null,
-    taskId: event.taskId ?? null,
-    actorType: event.actor.type,
-    actorId: event.actor.id,
-    correlationId: event.correlationId,
-    causationId: event.causationId ?? null,
-    payloadRef: event.payloadRef ?? null,
-    createdAt: event.createdAt,
-    dispatchedAt: null,
-  };
-}
+export const envelopeToInsert = eventEnvelopeToRow;
 
 /**
  * Write-only {@link EventBus} that persists every published event into the

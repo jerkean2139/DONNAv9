@@ -20,7 +20,7 @@ DONNAv9/
 │
 ├─ packages/
 │  ├─ core-domain/    # Phase 0 ✅ pure domain types + state machines
-│  ├─ db/             # Phase 1 ✅ Drizzle schema, migrations, client
+│  ├─ db/             # Phase 1 ✅ Drizzle schema, migrations, client, event mapper
 │  ├─ policy/         # Phase 1 ✅ deterministic permission + approval engine
 │  ├─ events/         # Phase 1 ✅ typed events + bus + transactional outbox
 │  ├─ work-router/    # Phase 3 ✅ execution-class selection (above Model Router)
