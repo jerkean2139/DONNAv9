@@ -111,7 +111,17 @@ importers:
 
   packages/adapters/base: {}
 
+  packages/config: {}
+
+  packages/context: {}
+
   packages/core-domain: {}
+
+  packages/cost-governor:
+    dependencies:
+      '@donna/config':
+        specifier: workspace:*
+        version: link:../config
 
   packages/db:
     dependencies:
@@ -134,6 +144,12 @@ importers:
       '@donna/core-domain':
         specifier: workspace:*
         version: link:../core-domain
+
+  packages/model-router:
+    dependencies:
+      '@donna/config':
+        specifier: workspace:*
+        version: link:../config
 
   packages/policy:
     dependencies:
