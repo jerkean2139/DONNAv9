@@ -150,12 +150,18 @@ export const events = pgTable(
     causationId: uuid('causation_id'),
     payloadRef: text('payload_ref'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    // Transactional-outbox marker: null until the dispatcher delivers this
+    // event to the bus (Technical Plan §4.2/§5). Written in the same
+    // transaction as the state change that produced the event.
+    dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
   },
   (t) => [
     index('events_org_idx').on(t.organizationId),
     index('events_objective_idx').on(t.objectiveId),
     index('events_task_idx').on(t.taskId),
     index('events_correlation_idx').on(t.correlationId),
+    // Supports the outbox fetch: undispatched events, oldest first.
+    index('events_undispatched_idx').on(t.dispatchedAt, t.createdAt),
   ],
 );
 

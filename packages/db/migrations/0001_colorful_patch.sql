@@ -1,0 +1,2 @@
+ALTER TABLE "events" ADD COLUMN "dispatched_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "events_undispatched_idx" ON "events" USING btree ("dispatched_at","created_at");

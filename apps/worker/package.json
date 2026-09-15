@@ -1,0 +1,26 @@
+{
+  "name": "@donna/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Durable-queue worker runtime for DONNA V2 (graphile-worker) + Postgres-backed transactional outbox dispatcher.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@donna/core-domain": "workspace:*",
+    "@donna/db": "workspace:*",
+    "@donna/events": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "graphile-worker": "^0.16.6"
+  }
+}
