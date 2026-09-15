@@ -35,7 +35,8 @@ DONNAv9/
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
 │  └─ adapters/       # Phase 3+ — one package per capability family (§7)
 │     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
-│     ├─ model-anthropic/  model-openai/  model-local/
+│     ├─ model-anthropic/  # Phase 4 ✅ Claude ModelAdapter (@anthropic-ai/sdk)
+│     ├─ model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/
 │     ├─ gmail/  drive/  ghl-zenoflo/  lead-builder/
 │     └─ coding-agent/  automation-mcp/
