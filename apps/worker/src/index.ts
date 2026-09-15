@@ -9,3 +9,4 @@ export { DrizzleOutboxStore, rowToEnvelope, type EventRow } from './outbox-store
 export { DrizzleOutboxBus, envelopeToInsert } from './outbox-bus.js';
 export { createModelAdapterResolver, type ModelAdapterResolver } from './model-adapters.js';
 export { parseWorkOrder, InvalidWorkOrderError } from './work-order-payload.js';
+export { buildCapabilityCatalog } from './capabilities.js';

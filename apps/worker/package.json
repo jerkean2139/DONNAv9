@@ -19,6 +19,7 @@
   "dependencies": {
     "@donna/adapter-anthropic": "workspace:*",
     "@donna/adapter-base": "workspace:*",
+    "@donna/adapter-ghl": "workspace:*",
     "@donna/config": "workspace:*",
     "@donna/core-domain": "workspace:*",
     "@donna/cost-governor": "workspace:*",

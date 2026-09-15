@@ -1,3 +1,4 @@
+import { buildCapabilityCatalog } from './capabilities.js';
 import { runWorker } from './worker.js';
 
 /**
@@ -10,5 +11,11 @@ if (connectionString === undefined || connectionString === '') {
   process.exit(1);
 }
 
-const runner = await runWorker({ connectionString });
+// Bind non-AI capability adapters (e.g. GoHighLevel CRM) from the environment.
+const capabilityCatalog = buildCapabilityCatalog();
+
+const runner = await runWorker({
+  connectionString,
+  ...(capabilityCatalog !== undefined ? { capabilityCatalog } : {}),
+});
 await runner.promise;

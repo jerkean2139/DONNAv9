@@ -117,6 +117,9 @@ importers:
       '@donna/adapter-base':
         specifier: workspace:*
         version: link:../../packages/adapters/base
+      '@donna/adapter-ghl':
+        specifier: workspace:*
+        version: link:../../packages/adapters/ghl
       '@donna/config':
         specifier: workspace:*
         version: link:../../packages/config
