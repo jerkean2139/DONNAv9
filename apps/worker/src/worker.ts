@@ -2,7 +2,11 @@ import { MODEL_REGISTRY } from '@donna/config';
 import { UsageLedger } from '@donna/cost-governor';
 import { createDatabase } from '@donna/db';
 import { InMemoryEventBus, OutboxDispatcher, type EventBus } from '@donna/events';
-import { executeWorkOrder, type OrchestratorDeps } from '@donna/orchestrator';
+import {
+  executeWorkOrder,
+  EXECUTE_WORK_ORDER_TASK,
+  type OrchestratorDeps,
+} from '@donna/orchestrator';
 import { CapabilityRegistry } from '@donna/work-router';
 import { run, type Runner } from 'graphile-worker';
 
@@ -75,7 +79,7 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
       'dispatch-outbox': async () => {
         await dispatcher.dispatchBatch(batchSize);
       },
-      'execute-work-order': async (payload) => {
+      [EXECUTE_WORK_ORDER_TASK]: async (payload) => {
         const order = parseWorkOrder(payload);
         const result = await executeWorkOrder(order, deps);
         // Terminal status is captured durably in the emitted events; log a line

@@ -1,13 +1,18 @@
-import type { ProjectId, RiskLevel, Scope } from '@donna/core-domain';
+import type { ObjectiveId, ProjectId, RiskLevel, Scope } from '@donna/core-domain';
+import type { WorkOrder } from '@donna/orchestrator';
 import { evaluate, type ResourceDescriptor } from '@donna/policy';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { OBJECTIVE_CREATE_ACTION } from './actions.js';
+import { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
 import { devPrincipalFromHeaders } from './principal.js';
 import type { ObjectiveService } from './services/objective-service.js';
+import type { TaskService } from './services/task-service.js';
+import type { WorkQueue } from './services/work-queue.js';
 
 export interface ServerDeps {
   readonly objectiveService: ObjectiveService;
+  readonly taskService: TaskService;
+  readonly workQueue: WorkQueue;
 }
 
 interface CreateObjectiveBody {
@@ -17,6 +22,26 @@ interface CreateObjectiveBody {
   riskLevel?: RiskLevel;
   projectId?: ProjectId;
   teamId?: string;
+}
+
+interface DispatchTaskBody {
+  goal?: string;
+  definitionOfDone?: string;
+  requiredCapabilities?: unknown;
+  prefersHuman?: boolean;
+  needsReasoning?: boolean;
+  reasoningTier?: number;
+  needsTools?: boolean;
+  needsVision?: boolean;
+  requireLocal?: boolean;
+  minContextTokens?: number;
+  modelRequest?: WorkOrder['modelRequest'];
+}
+
+function asStringArray(value: unknown): readonly string[] | null {
+  if (value === undefined) return [];
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string')) return value;
+  return null;
 }
 
 /**
@@ -79,6 +104,70 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.code(404).send({ error: 'not_found' });
     }
     return objective;
+  });
+
+  // The enqueue path (Technical Plan §4.1/§5): create a durable task under an
+  // objective and hand a work order to the durable queue. The worker's
+  // `execute-work-order` task then runs it through the orchestrator. The policy
+  // gate runs here, server-side, before anything is enqueued.
+  app.post('/objectives/:id/tasks', async (request, reply) => {
+    const principal = devPrincipalFromHeaders(request.headers as Record<string, unknown>);
+    if (principal === null) {
+      return reply.code(401).send({ error: 'unauthenticated' });
+    }
+
+    const { id } = request.params as { id: string };
+    const objective = await deps.objectiveService.get(id);
+    if (objective === null) {
+      return reply.code(404).send({ error: 'objective_not_found' });
+    }
+
+    const body = (request.body ?? {}) as DispatchTaskBody;
+    if (typeof body.goal !== 'string' || typeof body.definitionOfDone !== 'string') {
+      return reply.code(400).send({ error: 'goal and definitionOfDone are required' });
+    }
+    const requiredCapabilities = asStringArray(body.requiredCapabilities);
+    if (requiredCapabilities === null) {
+      return reply.code(400).send({ error: 'requiredCapabilities must be an array of strings' });
+    }
+
+    // Gate the dispatch against the objective's own scope/ownership so a task
+    // under a team- or project-scoped objective inherits that boundary.
+    const resource: ResourceDescriptor = {
+      organizationId: principal.organizationId,
+      scope: objective.scope,
+      ownerUserId: objective.ownerId,
+      ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
+    };
+    const decision = evaluate({ principal, action: TASK_DISPATCH_ACTION, resource });
+    if (decision.effect === 'deny') {
+      return reply.code(403).send({ error: decision.reason, message: decision.message });
+    }
+    if (decision.effect === 'requires_approval') {
+      return reply.code(202).send({ status: 'approval_required', reason: decision.reason });
+    }
+
+    const task = await deps.taskService.create(
+      { objectiveId: id as ObjectiveId, goal: body.goal, definitionOfDone: body.definitionOfDone },
+      principal,
+    );
+
+    const order: WorkOrder = {
+      organizationId: principal.organizationId,
+      taskId: task.id,
+      requiredCapabilities,
+      ...(body.prefersHuman !== undefined ? { prefersHuman: body.prefersHuman } : {}),
+      ...(body.needsReasoning !== undefined ? { needsReasoning: body.needsReasoning } : {}),
+      ...(body.reasoningTier !== undefined ? { reasoningTier: body.reasoningTier } : {}),
+      ...(body.needsTools !== undefined ? { needsTools: body.needsTools } : {}),
+      ...(body.needsVision !== undefined ? { needsVision: body.needsVision } : {}),
+      ...(body.requireLocal !== undefined ? { requireLocal: body.requireLocal } : {}),
+      ...(body.minContextTokens !== undefined ? { minContextTokens: body.minContextTokens } : {}),
+      ...(body.modelRequest !== undefined ? { modelRequest: body.modelRequest } : {}),
+    };
+    const { jobId } = await deps.workQueue.enqueue(order);
+
+    return reply.code(202).send({ status: 'queued', task, jobId });
   });
 
   return app;

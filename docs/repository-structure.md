@@ -14,7 +14,7 @@ DONNAv9/
 │
 ├─ apps/                                 # (added from Phase 1+)
 │  ├─ web/            # Phase 2 ✅ React command-first shell (Vite + Tailwind)
-│  ├─ control-plane/  # Phase 1 ✅ Fastify API skeleton (identity→policy→objective)
+│  ├─ control-plane/  # Phase 1 ✅ Fastify API (identity→policy→objective/task→enqueue)
 │  ├─ worker/         # Phase 1 ✅ durable job runtime + outbox; runs orchestrator
 │  └─ node-agent/     # Phase 5 — Dell/Omen heartbeat + local inference
 │

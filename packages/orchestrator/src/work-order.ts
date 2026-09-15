@@ -40,6 +40,13 @@ export interface WorkOrder {
   readonly budget?: { readonly budget: Budget; readonly spentUsd: number };
 }
 
+/**
+ * The graphile-worker task identifier for an enqueued work order. Shared by the
+ * producer (the control-plane API's work queue) and the consumer (the worker's
+ * task list), so the job contract has one source of truth.
+ */
+export const EXECUTE_WORK_ORDER_TASK = 'execute-work-order';
+
 export type WorkOrderStatus =
   | 'completed'
   | 'awaiting_human'
