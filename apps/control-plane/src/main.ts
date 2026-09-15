@@ -16,6 +16,8 @@ import {
 } from './services/task-dispatcher.js';
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
+import { SvixWebhookVerifier } from './webhooks/clerk-verify.js';
+import { DrizzleProvisioningService } from './webhooks/provisioning.js';
 
 /**
  * Build the request authenticator (Technical Plan §6/§8). When `AUTH_JWKS_URL`
@@ -59,10 +61,21 @@ if (connectionString !== undefined && connectionString !== '') {
   // `add_job` resolves even if the worker process has not booted yet.
   await runMigrations({ connectionString });
   const db = createDatabase(connectionString);
+  const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
   deps = {
     objectiveService: new DrizzleObjectiveService(db),
     taskDispatcher: new DrizzleTaskDispatcher(db),
     authenticate: buildAuthenticator(db),
+    // The provisioning webhook needs a database; wire it only when its signing
+    // secret is set (from the Clerk dashboard, via the environment — §8).
+    ...(webhookSecret !== undefined && webhookSecret !== ''
+      ? {
+          clerkWebhook: {
+            verifier: new SvixWebhookVerifier(webhookSecret),
+            provisioning: new DrizzleProvisioningService(db),
+          },
+        }
+      : {}),
   };
 } else {
   console.warn('DATABASE_URL not set — using in-memory services (state is not durable).');

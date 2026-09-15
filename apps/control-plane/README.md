@@ -69,6 +69,29 @@ mfa_required`, `403 no_account` (valid token, no provisioned user/membership).
 
 Secrets/URLs come from the environment / Railway, never source (§8).
 
+## Provisioning webhook
+
+`POST /webhooks/clerk` turns Clerk identity events into authorizable principals —
+without it, a valid Clerk token resolves to `403 no_account`. It is served only
+when `CLERK_WEBHOOK_SECRET` is set (with a database), and is authenticated by the
+**Svix signature over the raw body**, not the JWT authenticator — the signature
+is its auth. Handling:
+
+- Verify the signature (`svix`) → `401 invalid_signature` on failure, before any
+  DB work. A malformed but signed payload → `400`. Unknown event types → `200`
+  no-op (so Clerk does not retry).
+- **`organizationMembership.created` / `.updated`** → in one transaction, upsert
+  the organization (by `external_auth_id`), the user (with `external_auth_id`),
+  and the org-level membership whose role the auth resolver reads. Clerk
+  `org:admin` → `admin`, everyone else → `team_member`; `owner` is never granted
+  from a webhook.
+- **`user.updated`** updates email/name; **`user.deleted`** clears
+  `external_auth_id` (revokes access, keeps history); **`organization.updated`**
+  updates the org; **`organizationMembership.deleted`** removes the membership.
+
+`CLERK_WEBHOOK_SECRET` is the endpoint's signing secret from the Clerk dashboard,
+via the environment — never source.
+
 ## State: durable with `DATABASE_URL`, in-memory without
 
 The composition root (`main.ts`) picks the backing by `DATABASE_URL`:

@@ -14,6 +14,9 @@ export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
+  // Stable id from the external identity provider's organization (e.g. Clerk
+  // org id). Nullable; unique when present so a webhook maps to one org.
+  externalAuthId: text('external_auth_id').unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

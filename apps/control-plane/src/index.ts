@@ -56,3 +56,16 @@ export {
   type VerifiedIdentity,
 } from './auth/token-verifier.js';
 export { DrizzlePrincipalResolver, type PrincipalResolver } from './auth/principal-resolver.js';
+export {
+  SvixWebhookVerifier,
+  WebhookVerificationError,
+  type WebhookVerifier,
+} from './webhooks/clerk-verify.js';
+export { DrizzleProvisioningService, type ProvisioningService } from './webhooks/provisioning.js';
+export {
+  parseClerkEvent,
+  parseMembershipSync,
+  mapClerkRole,
+  ClerkPayloadError,
+  type ClerkEvent,
+} from './webhooks/clerk-events.js';

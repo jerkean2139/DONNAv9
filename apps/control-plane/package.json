@@ -25,6 +25,7 @@
     "drizzle-orm": "^0.36.4",
     "fastify": "^5.1.0",
     "graphile-worker": "^0.16.6",
-    "jose": "^5.9.6"
+    "jose": "^5.9.6",
+    "svix": "^1.42.0"
   }
 }
