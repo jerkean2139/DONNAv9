@@ -93,15 +93,33 @@ importers:
 
   apps/worker:
     dependencies:
+      '@donna/adapter-anthropic':
+        specifier: workspace:*
+        version: link:../../packages/adapters/model-anthropic
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../../packages/adapters/base
+      '@donna/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@donna/core-domain':
         specifier: workspace:*
         version: link:../../packages/core-domain
+      '@donna/cost-governor':
+        specifier: workspace:*
+        version: link:../../packages/cost-governor
       '@donna/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@donna/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@donna/orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/orchestrator
+      '@donna/work-router':
+        specifier: workspace:*
+        version: link:../../packages/work-router
       drizzle-orm:
         specifier: ^0.36.4
         version: 0.36.4(@types/pg@8.23.1)(@types/react@18.3.31)(pg@8.23.0)(postgres@3.4.9)(react@18.3.1)

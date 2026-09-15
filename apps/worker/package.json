@@ -17,9 +17,15 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@donna/adapter-anthropic": "workspace:*",
+    "@donna/adapter-base": "workspace:*",
+    "@donna/config": "workspace:*",
     "@donna/core-domain": "workspace:*",
+    "@donna/cost-governor": "workspace:*",
     "@donna/db": "workspace:*",
     "@donna/events": "workspace:*",
+    "@donna/orchestrator": "workspace:*",
+    "@donna/work-router": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "graphile-worker": "^0.16.6"
   }
