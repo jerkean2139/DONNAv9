@@ -9,6 +9,7 @@ import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { DrizzleTaskDispatcher } from './services/task-dispatcher.js';
 
@@ -80,6 +81,34 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     );
     expect(events).toHaveLength(1);
     expect(events[0]!.dispatched_at).toBeNull();
+  });
+
+  it('resolves a verified token subject to the trusted principal (role from the DB)', async () => {
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const sub = `user_${randomUUID().slice(0, 8)}`;
+    await db.insert(schema.organizations).values({ id: organizationId, name: 'Acme', slug: sub });
+    await db.insert(schema.users).values({
+      id: userId,
+      organizationId,
+      email: `${userId}@x.com`,
+      displayName: 'Test',
+      externalAuthId: sub,
+    });
+    await db
+      .insert(schema.memberships)
+      .values({ organizationId, userId, teamId: null, role: 'executive' });
+
+    const resolver = new DrizzlePrincipalResolver(db);
+    const principal = await resolver.resolve({ subject: sub, claims: { sub } });
+    expect(principal).not.toBeNull();
+    expect(principal!.userId).toBe(userId);
+    expect(principal!.organizationId).toBe(organizationId);
+    expect(principal!.role).toBe('executive');
+    expect(principal!.actorKind).toBe('human');
+
+    // An unknown subject resolves to null (no leak, no default access).
+    expect(await resolver.resolve({ subject: 'nobody', claims: { sub: 'nobody' } })).toBeNull();
   });
 
   it('reads are tenant-scoped: another org gets null', async () => {

@@ -4,7 +4,7 @@ import { evaluate, type ResourceDescriptor } from '@donna/policy';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
-import { devPrincipalFromHeaders } from './principal.js';
+import type { Authenticator } from './auth/authenticate.js';
 import type { ObjectiveService } from './services/objective-service.js';
 import type { TaskDispatcher } from './services/task-dispatcher.js';
 
@@ -12,6 +12,12 @@ export interface ServerDeps {
   readonly objectiveService: ObjectiveService;
   /** Atomically creates a task and enqueues its work order (§4.2/§5). */
   readonly taskDispatcher: TaskDispatcher;
+  /**
+   * Verifies the request and returns the trusted principal, or a refusal. In
+   * production a JWT authenticator (provider owns login + MFA); the dev header
+   * shim only when no provider is configured (§6/§8).
+   */
+  readonly authenticate: Authenticator;
 }
 
 interface CreateObjectiveBody {
@@ -55,10 +61,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.get('/health', async () => ({ status: 'ok' }));
 
   app.post('/objectives', async (request, reply) => {
-    const principal = devPrincipalFromHeaders(request.headers as Record<string, unknown>);
-    if (principal === null) {
-      return reply.code(401).send({ error: 'unauthenticated' });
+    const auth = await deps.authenticate(request.headers as Record<string, unknown>);
+    if (!auth.ok) {
+      return reply.code(auth.status).send({ error: auth.error });
     }
+    const principal = auth.principal;
 
     const body = (request.body ?? {}) as CreateObjectiveBody;
     if (typeof body.requestedOutcome !== 'string' || typeof body.definitionOfDone !== 'string') {
@@ -97,10 +104,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.get('/objectives/:id', async (request, reply) => {
-    const principal = devPrincipalFromHeaders(request.headers as Record<string, unknown>);
-    if (principal === null) {
-      return reply.code(401).send({ error: 'unauthenticated' });
+    const auth = await deps.authenticate(request.headers as Record<string, unknown>);
+    if (!auth.ok) {
+      return reply.code(auth.status).send({ error: auth.error });
     }
+    const principal = auth.principal;
     const { id } = request.params as { id: string };
     // Reads are tenant-scoped: another org's objective reads as not-found.
     const objective = await deps.objectiveService.get(id, principal.organizationId);
@@ -115,10 +123,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // `execute-work-order` task then runs it through the orchestrator. The policy
   // gate runs here, server-side, before anything is enqueued.
   app.post('/objectives/:id/tasks', async (request, reply) => {
-    const principal = devPrincipalFromHeaders(request.headers as Record<string, unknown>);
-    if (principal === null) {
-      return reply.code(401).send({ error: 'unauthenticated' });
+    const auth = await deps.authenticate(request.headers as Record<string, unknown>);
+    if (!auth.ok) {
+      return reply.code(auth.status).send({ error: auth.error });
     }
+    const principal = auth.principal;
 
     const { id } = request.params as { id: string };
     const objective = await deps.objectiveService.get(id, principal.organizationId);
