@@ -38,6 +38,7 @@ DONNAv9/
 │     ├─ base/        # Phase 3 ✅ capability + model adapter contracts
 │     ├─ capability-fn/  # Phase 4 ✅ deterministic in-process capability adapter
 │     ├─ http/         # Phase 4 ✅ HTTP capability adapter (automation class, SSRF-safe)
+│     ├─ ghl/          # Phase 4 ✅ GoHighLevel CRM adapter (concrete, on adapter-http)
 │     ├─ model-anthropic/  # Phase 4 ✅ Claude ModelAdapter (@anthropic-ai/sdk)
 │     ├─ model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/

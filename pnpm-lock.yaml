@@ -153,6 +153,15 @@ importers:
         specifier: workspace:*
         version: link:../base
 
+  packages/adapters/ghl:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../base
+      '@donna/adapter-http':
+        specifier: workspace:*
+        version: link:../http
+
   packages/adapters/http:
     dependencies:
       '@donna/adapter-base':
