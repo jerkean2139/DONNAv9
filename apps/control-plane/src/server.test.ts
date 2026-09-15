@@ -1,6 +1,7 @@
 import { InMemoryEventBus } from '@donna/events';
 import { describe, expect, it } from 'vitest';
 
+import { devAuthenticator } from './auth/authenticate.js';
 import { buildServer } from './server.js';
 import { InMemoryObjectiveService } from './services/objective-service.js';
 import { InMemoryTaskDispatcher } from './services/task-dispatcher.js';
@@ -17,6 +18,7 @@ function makeApp() {
   const app = buildServer({
     objectiveService: new InMemoryObjectiveService(bus),
     taskDispatcher: new InMemoryTaskDispatcher(new InMemoryTaskService(bus), workQueue),
+    authenticate: devAuthenticator(),
   });
   return { app, publishedTypes, workQueue };
 }

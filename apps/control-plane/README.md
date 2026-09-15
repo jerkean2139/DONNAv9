@@ -38,13 +38,36 @@ request's routing hints (`requiredCapabilities`, `needsReasoning`,
 `createGraphileWorkQueue(DATABASE_URL)` is wired in `main.ts`; without a database
 the process falls back to the in-memory queue (jobs are not durable) and warns.
 
-## Auth is a temporary dev shim
+## Authentication
 
-Identity is read from `x-donna-*` request headers (`devPrincipalFromHeaders`).
-**This is not production authentication** — real auth (Supabase Auth + MFA,
-server-side session validation) lands in a later phase. The policy engine still
-makes every authorization decision; the shim only assembles the trusted
-principal a verified session would provide.
+Every mutating route (and objective reads) authenticates via an injected
+`Authenticator` before the policy gate runs. `main.ts` picks it by environment:
+
+- **Production JWT** (`AUTH_JWKS_URL` set, with a database) — the identity
+  provider (**Clerk**) owns signup/login/MFA; the API only **verifies** the
+  bearer JWT and derives the principal. `verifyToken` checks signature (via the
+  provider's JWKS), issuer/audience and expiry, and **enforces MFA** as a
+  server-side claim when `AUTH_REQUIRE_MFA=true`. `DrizzlePrincipalResolver` then
+  maps the token subject → a user via `users.external_auth_id`, and reads the
+  user's **membership role from our tables** — authority is server-side RBAC,
+  never taken from the token (§6). Outcomes: `401` missing/invalid token, `403
+mfa_required`, `403 no_account` (valid token, no provisioned user/membership).
+  It is provider-agnostic — any OIDC/JWT issuer works by pointing the env config
+  at its JWKS.
+
+  | Env                             | Meaning                                                                          |
+  | ------------------------------- | -------------------------------------------------------------------------------- |
+  | `AUTH_JWKS_URL`                 | Provider JWKS endpoint (enables JWT auth)                                        |
+  | `AUTH_ISSUER` / `AUTH_AUDIENCE` | Expected `iss` / `aud` (optional)                                                |
+  | `AUTH_REQUIRE_MFA`              | `true` to require the MFA claim                                                  |
+  | `AUTH_MFA_CLAIM`                | Claim signalling MFA (default `mfa`; Clerk sets it via a session-token template) |
+
+- **Dev shim** (no `AUTH_JWKS_URL`) — identity from `x-donna-*` headers
+  (`devPrincipalFromHeaders`), with a loud warning. **Not production auth**; for
+  local runs and tests only. The policy engine still makes every authorization
+  decision.
+
+Secrets/URLs come from the environment / Railway, never source (§8).
 
 ## State: durable with `DATABASE_URL`, in-memory without
 
@@ -75,8 +98,8 @@ by another organization reads as `null`, never crosses the boundary. `GET
 principal's organization, so a valid principal in the wrong org gets `404`, not
 the row. The domain `Objective` carries no org id, so the in-memory store tracks
 tenancy alongside it, matching the Drizzle query's `WHERE organization_id = …`.
-(Production auth still replaces the dev header shim later; the scoping is
-independent of that.)
+(Scoping is independent of how the principal is authenticated — see
+Authentication above.)
 
 ## Running
 

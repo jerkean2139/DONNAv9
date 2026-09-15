@@ -41,3 +41,18 @@ export {
 } from './db/mappers.js';
 export { devPrincipalFromHeaders } from './principal.js';
 export { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
+export {
+  devAuthenticator,
+  jwtAuthenticator,
+  type Authenticator,
+  type AuthOutcome,
+  type JwtAuthenticatorDeps,
+} from './auth/authenticate.js';
+export {
+  verifyToken,
+  TokenInvalidError,
+  MfaRequiredError,
+  type VerifierConfig,
+  type VerifiedIdentity,
+} from './auth/token-verifier.js';
+export { DrizzlePrincipalResolver, type PrincipalResolver } from './auth/principal-resolver.js';

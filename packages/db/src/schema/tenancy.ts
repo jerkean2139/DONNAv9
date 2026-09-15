@@ -27,11 +27,16 @@ export const users = pgTable(
       .references(() => organizations.id, { onDelete: 'cascade' }),
     email: text('email').notNull(),
     displayName: text('display_name').notNull(),
+    // Stable subject id from the external identity provider (e.g. Clerk `sub`).
+    // Nullable — seeded/service users may have none; unique when present so a
+    // verified token maps to exactly one user (Technical Plan §6/§8).
+    externalAuthId: text('external_auth_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     unique('users_org_email_unique').on(t.organizationId, t.email),
+    unique('users_external_auth_id_unique').on(t.externalAuthId),
     index('users_org_idx').on(t.organizationId),
   ],
 );

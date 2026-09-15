@@ -1,7 +1,11 @@
-import { createDatabase } from '@donna/db';
+import { createDatabase, type DonnaDatabase } from '@donna/db';
 import { InMemoryEventBus } from '@donna/events';
 import { runMigrations } from 'graphile-worker';
+import { createRemoteJWKSet } from 'jose';
 
+import { devAuthenticator, jwtAuthenticator, type Authenticator } from './auth/authenticate.js';
+import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
+import { verifyToken, type VerifierConfig } from './auth/token-verifier.js';
 import { buildServer, type ServerDeps } from './server.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { InMemoryObjectiveService } from './services/objective-service.js';
@@ -12,6 +16,33 @@ import {
 } from './services/task-dispatcher.js';
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
+
+/**
+ * Build the request authenticator (Technical Plan §6/§8). When `AUTH_JWKS_URL`
+ * is set (and a database is available for the principal lookup), production JWT
+ * auth is used: the provider (Clerk) owns login + MFA, we verify the token and
+ * derive the principal from our tables. Otherwise the dev header shim, with a
+ * loud warning — never rely on it in production. Secrets/URLs come from the
+ * environment, never source.
+ */
+function buildAuthenticator(db: DonnaDatabase | undefined): Authenticator {
+  const jwksUrl = process.env.AUTH_JWKS_URL;
+  if (jwksUrl === undefined || jwksUrl === '' || db === undefined) {
+    console.warn('AUTH_JWKS_URL not set — using the dev header shim (NOT production auth).');
+    return devAuthenticator();
+  }
+  const config: VerifierConfig = {
+    key: createRemoteJWKSet(new URL(jwksUrl)),
+    ...(process.env.AUTH_ISSUER !== undefined ? { issuer: process.env.AUTH_ISSUER } : {}),
+    ...(process.env.AUTH_AUDIENCE !== undefined ? { audience: process.env.AUTH_AUDIENCE } : {}),
+    requireMfa: process.env.AUTH_REQUIRE_MFA === 'true',
+    ...(process.env.AUTH_MFA_CLAIM !== undefined ? { mfaClaim: process.env.AUTH_MFA_CLAIM } : {}),
+  };
+  return jwtAuthenticator({
+    verify: (token) => verifyToken(token, config),
+    resolver: new DrizzlePrincipalResolver(db),
+  });
+}
 
 /**
  * Process entrypoint. With `DATABASE_URL` set, the API is durable: objectives
@@ -31,6 +62,7 @@ if (connectionString !== undefined && connectionString !== '') {
   deps = {
     objectiveService: new DrizzleObjectiveService(db),
     taskDispatcher: new DrizzleTaskDispatcher(db),
+    authenticate: buildAuthenticator(db),
   };
 } else {
   console.warn('DATABASE_URL not set — using in-memory services (state is not durable).');
@@ -43,6 +75,7 @@ if (connectionString !== undefined && connectionString !== '') {
   deps = {
     objectiveService: new InMemoryObjectiveService(bus),
     taskDispatcher,
+    authenticate: buildAuthenticator(undefined),
   };
 }
 
