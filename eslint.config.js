@@ -90,7 +90,7 @@ export default tseslint.config(
   },
   {
     // Test files may be looser.
-    files: ['**/*.test.ts', '**/*.spec.ts'],
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
