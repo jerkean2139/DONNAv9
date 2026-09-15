@@ -166,6 +166,33 @@ importers:
         specifier: workspace:*
         version: link:../config
 
+  packages/orchestrator:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../adapters/base
+      '@donna/config':
+        specifier: workspace:*
+        version: link:../config
+      '@donna/core-domain':
+        specifier: workspace:*
+        version: link:../core-domain
+      '@donna/cost-governor':
+        specifier: workspace:*
+        version: link:../cost-governor
+      '@donna/events':
+        specifier: workspace:*
+        version: link:../events
+      '@donna/model-router':
+        specifier: workspace:*
+        version: link:../model-router
+      '@donna/policy':
+        specifier: workspace:*
+        version: link:../policy
+      '@donna/work-router':
+        specifier: workspace:*
+        version: link:../work-router
+
   packages/policy:
     dependencies:
       '@donna/core-domain':

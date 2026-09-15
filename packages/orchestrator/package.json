@@ -1,0 +1,34 @@
+{
+  "name": "@donna/orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DONNA V2 orchestrator — runs a work order through policy, Work Router, Model Router, adapters, cost governor and the event stream.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@donna/core-domain": "workspace:*",
+    "@donna/adapter-base": "workspace:*",
+    "@donna/config": "workspace:*",
+    "@donna/cost-governor": "workspace:*",
+    "@donna/events": "workspace:*",
+    "@donna/model-router": "workspace:*",
+    "@donna/policy": "workspace:*",
+    "@donna/work-router": "workspace:*"
+  }
+}
