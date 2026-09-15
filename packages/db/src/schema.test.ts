@@ -3,6 +3,7 @@ import {
   EXECUTION_CLASSES,
   OBJECTIVE_STATUSES,
   RISK_LEVELS,
+  ROLES,
   SCOPES,
   SOURCE_CONFIDENCE,
   TASK_STATUSES,
@@ -14,6 +15,7 @@ import {
   executionClassEnum,
   objectiveStatusEnum,
   riskLevelEnum,
+  roleEnum,
   scopeEnum,
   sourceConfidenceEnum,
   taskStatusEnum,
@@ -43,6 +45,7 @@ import {
  */
 describe('schema enums mirror core-domain', () => {
   it('scope', () => expect(scopeEnum.enumValues).toEqual([...SCOPES]));
+  it('role', () => expect(roleEnum.enumValues).toEqual([...ROLES]));
   it('objective status', () =>
     expect(objectiveStatusEnum.enumValues).toEqual([...OBJECTIVE_STATUSES]));
   it('risk level', () => expect(riskLevelEnum.enumValues).toEqual([...RISK_LEVELS]));

@@ -48,6 +48,12 @@ importers:
         specifier: ^0.28.1
         version: 0.28.1
 
+  packages/policy:
+    dependencies:
+      '@donna/core-domain':
+        specifier: workspace:*
+        version: link:../core-domain
+
 packages:
 
   '@drizzle-team/brocli@0.10.2':
