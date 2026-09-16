@@ -33,7 +33,7 @@ they don't collide with the already-merged GitHub PRs #20 (auto-migration) and
    `idempotencyKey`, and any per-capability authority are **not** enqueued.
    Confirmed.
 4. **Idempotency is not enforced.** `tasks.idempotency_key` has a **non-unique**
-   index; the dedicated `idempotency_keys` table (which *does* have a unique
+   index; the dedicated `idempotency_keys` table (which _does_ have a unique
    constraint) is referenced only by a schema test; and the orchestrator's
    execution context sets `correlationId` only — **never `idempotencyKey`**.
    Confirmed.
@@ -42,19 +42,19 @@ they don't collide with the already-merged GitHub PRs #20 (auto-migration) and
 
 **Where I'd correct or add nuance (flagging before planning, as asked):**
 
-- **The API *does* gate dispatch.** `POST /objectives/:id/tasks` runs
+- **The API _does_ gate dispatch.** `POST /objectives/:id/tasks` runs
   `evaluate()` with a full `ResourceDescriptor` (scope, owner, projectId) against
   a **server-defined** action constant, and returns 403/202. So it's not true
   that policy runs "only when JSON happens to include it" — that's true of the
-  **worker**, not the API. This matters: the fix is *defense-in-depth at
-  execution* (reconstruct policy in the worker from durable data), not "add the
+  **worker**, not the API. This matters: the fix is _defense-in-depth at
+  execution_ (reconstruct policy in the worker from durable data), not "add the
   missing gate." I agree with reconstructing server-side; I'm just naming the
   starting point accurately.
 - **"Every task defaults to PREPARE" is the safe direction, not the risk.**
-  PREPARE is the *lowest* authority level, and the dispatch action's authority is
-  a server constant, not client-supplied — so JSON can't *elevate* authority
-  today. The real gap is that per-capability authority for the *actual
-  side-effecting work* isn't modeled or re-checked at execution. Same fix, more
+  PREPARE is the _lowest_ authority level, and the dispatch action's authority is
+  a server constant, not client-supplied — so JSON can't _elevate_ authority
+  today. The real gap is that per-capability authority for the _actual
+  side-effecting work_ isn't modeled or re-checked at execution. Same fix, more
   precise framing.
 - **The idempotency adapter wiring is already ~half done.** The HTTP adapter
   already reads `ctx.idempotencyKey` and emits an `Idempotency-Key` header, and
@@ -69,14 +69,14 @@ they don't collide with the already-merged GitHub PRs #20 (auto-migration) and
 - **Ordering dependency the first brief missed:** enforcing **PROJECT** scope on
   reads (SEC-2) needs project membership, which does **not** exist yet — the
   resolver hardcodes `projectIds: []` and there's a `projects` table but no
-  membership table. TEAM scope *is* enforceable today (`teamIds` is populated).
+  membership table. TEAM scope _is_ enforceable today (`teamIds` is populated).
   So tenant work (SEC-3) must land **before or with** full scoped-read
   enforcement. The revised ordering already reflects this; SEC-2 ships TEAM +
   PRIVATE + org enforcement now and PROJECT enforcement is completed by SEC-3.
 
 **Bottom line:** the architecture is sound (Work Router above Model Router,
 clean provider boundaries, transactional outbox, green tests incl. live-PG). The
-gaps are integrity *wiring*, not redesigns — exactly what to fix pre-production.
+gaps are integrity _wiring_, not redesigns — exactly what to fix pre-production.
 "BLOCKED" is fair, driven mostly by SEC-1. Grade quibbling aside, the technical
 findings hold up.
 
@@ -89,6 +89,7 @@ findings hold up.
 **Problem:** dev-header auth + in-memory fallback can serve production.
 
 **Design:**
+
 - Add an explicit `APP_ENV` (`production` | `development` | `test`), read once at
   boot.
 - `development`/`test`: dev header shim permitted (as today), loud warning.
@@ -133,6 +134,7 @@ the child→parent key), so a mismatched-org reference isn't structurally
 prevented; `projectIds` is always empty.
 
 **Design (RLS deferred):**
+
 - Add a `project_memberships` table (org + project + user, unique).
 - Add composite `(organization_id, id)` targets and composite FKs on child rows
   (tasks→objectives, memberships→teams, etc.) so a row can't reference a parent
@@ -199,6 +201,7 @@ adapters; kill switches / approval lifecycle / approver eligibility / policy
 audit not wired to execution.
 
 **Design:**
+
 - Unique partial `(organization_id, idempotency_key)` (partial: null keys stay
   valid). Reserve the key transactionally before execution; persist
   pending/completed/failed; reuse the prior result on a completed retry; handle
