@@ -240,6 +240,144 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect((payloads[0]!.payload as { taskId: string }).taskId).toBe(task.id);
   });
 
+  // SEC-3b: composite (organization_id, id) foreign keys reject a row that
+  // points at a parent in a DIFFERENT organization — defense-in-depth beneath
+  // the policy engine. The single-column FK alone would accept these (the
+  // referenced row exists); only the composite FK catches the tenant mismatch.
+  it('rejects a task whose objective belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const objectiveA = await new DrizzleObjectiveService(db).create(
+      { requestedOutcome: 'x', definitionOfDone: 'y', scope: 'ORGANIZATION', riskLevel: 'low' },
+      orgA,
+    );
+    // A task in orgB that points at orgA's objective must fail at the DB.
+    await expect(
+      db.insert(schema.tasks).values({
+        id: randomUUID(),
+        organizationId: orgB.organizationId,
+        objectiveId: objectiveA.id,
+        goal: 'cross-tenant',
+        definitionOfDone: 'nope',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a task_dependency edge that crosses the tenant boundary', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const objectiveA = await new DrizzleObjectiveService(db).create(
+      { requestedOutcome: 'a', definitionOfDone: 'a', scope: 'ORGANIZATION', riskLevel: 'low' },
+      orgA,
+    );
+    const objectiveB = await new DrizzleObjectiveService(db).create(
+      { requestedOutcome: 'b', definitionOfDone: 'b', scope: 'ORGANIZATION', riskLevel: 'low' },
+      orgB,
+    );
+    const taskA = randomUUID();
+    const taskB = randomUUID();
+    await db.insert(schema.tasks).values({
+      id: taskA,
+      organizationId: orgA.organizationId,
+      objectiveId: objectiveA.id,
+      goal: 'a',
+      definitionOfDone: 'a',
+    });
+    await db.insert(schema.tasks).values({
+      id: taskB,
+      organizationId: orgB.organizationId,
+      objectiveId: objectiveB.id,
+      goal: 'b',
+      definitionOfDone: 'b',
+    });
+    // An orgB dependency that depends on orgA's task must fail at the DB.
+    await expect(
+      db.insert(schema.taskDependencies).values({
+        organizationId: orgB.organizationId,
+        taskId: taskB,
+        dependsOnTaskId: taskA,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects an event that references another organization’s objective', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const objectiveA = await new DrizzleObjectiveService(db).create(
+      { requestedOutcome: 'x', definitionOfDone: 'y', scope: 'ORGANIZATION', riskLevel: 'low' },
+      orgA,
+    );
+    await expect(
+      db.insert(schema.events).values({
+        id: randomUUID(),
+        organizationId: orgB.organizationId,
+        objectiveId: objectiveA.id,
+        type: 'objective.created',
+        actorType: 'human',
+        actorId: orgB.userId,
+        correlationId: randomUUID(),
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a membership whose user belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    // orgB membership pointing at orgA's user must fail at the DB.
+    await expect(
+      db.insert(schema.memberships).values({
+        organizationId: orgB.organizationId,
+        userId: orgA.userId,
+        teamId: null,
+        role: 'team_member',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('still accepts an in-tenant task, dependency, and event (sanity)', async () => {
+    const org = await seedTenant(db);
+    const objective = await new DrizzleObjectiveService(db).create(
+      { requestedOutcome: 'x', definitionOfDone: 'y', scope: 'ORGANIZATION', riskLevel: 'low' },
+      org,
+    );
+    const t1 = randomUUID();
+    const t2 = randomUUID();
+    await db.insert(schema.tasks).values([
+      {
+        id: t1,
+        organizationId: org.organizationId,
+        objectiveId: objective.id,
+        goal: 'one',
+        definitionOfDone: 'x',
+      },
+      {
+        id: t2,
+        organizationId: org.organizationId,
+        objectiveId: objective.id,
+        goal: 'two',
+        definitionOfDone: 'x',
+        parentTaskId: t1,
+      },
+    ]);
+    await db
+      .insert(schema.taskDependencies)
+      .values({ organizationId: org.organizationId, taskId: t2, dependsOnTaskId: t1 });
+    await db.insert(schema.events).values({
+      id: randomUUID(),
+      organizationId: org.organizationId,
+      objectiveId: objective.id,
+      taskId: t1,
+      type: 'task.created',
+      actorType: 'human',
+      actorId: org.userId,
+      correlationId: randomUUID(),
+    });
+    const deps = await db.execute(
+      sql`select count(*)::int as n from task_dependencies where organization_id = ${org.organizationId}`,
+    );
+    expect(deps[0]!.n).toBe(1);
+  });
+
   it('rolls back the whole dispatch when the objective FK is violated', async () => {
     const principal = await seedTenant(db);
     const dispatcher = new DrizzleTaskDispatcher(db);

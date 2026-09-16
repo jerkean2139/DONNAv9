@@ -135,22 +135,46 @@ headers or ids; existing API tests stay green.
 the child→parent key), so a mismatched-org reference isn't structurally
 prevented; `projectIds` is always empty.
 
-**Design (RLS deferred):**
+Split for reviewability into **SEC-3a** (additive: membership + team binding,
+low migration risk) and **SEC-3b** (composite FKs, which reshape the reference
+graph). Both merged.
 
-- Add a `project_memberships` table (org + project + user, unique).
-- Add composite `(organization_id, id)` targets and composite FKs on child rows
-  (tasks→objectives, memberships→teams, etc.) so a row can't reference a parent
-  in another org.
-- Populate `projectIds` in the principal resolver from `project_memberships`.
-- Adversarial cross-tenant integration tests (attempt cross-org reads/writes
-  through every service; expect deny/not-found).
+**SEC-3a — done (PR #26):**
 
-**Acceptance:** cross-tenant reference insert fails at the DB; `projectIds`
-populated; SEC-2's PROJECT case now enforced; adversarial tests pass against live
-PG.
+- `project_memberships` table (org + project + user, unique per project+user).
+- `Objective.teamId` persisted to the generic `scope_ref` column and surfaced
+  only for TEAM scope, so a TEAM-scoped read can reconstruct team membership.
+- Principal resolver populates `projectIds` from `project_memberships`, scoped
+  to the user's organization.
+- Completes SEC-2's TEAM/PROJECT read enforcement (member-allowed /
+  non-member-hidden unit tests; live-DB test proving membership → `projectIds`).
 
-**Deps:** SEC-2 merged. **Migration:** new table + composite constraints;
-document forward + rollback; migrator already runs on boot (PR #20).
+**SEC-3b — done:**
+
+- Composite `UNIQUE (organization_id, id)` targets on `users`, `teams`,
+  `projects`, `objectives`, `tasks`.
+- Composite `(organization_id, <ref>)` FKs on child rows (tasks→objectives,
+  tasks→tasks parent, task_dependencies→tasks ×2, events→objectives/tasks,
+  objectives→users/projects, memberships→users/teams,
+  project_memberships→projects/users) so a row cannot reference a parent in
+  another org.
+- **Additive, low-risk shape:** existing single-column FKs are kept (they own
+  the `ON DELETE` cascade / set-null behavior); the composite FKs are added
+  with `ON DELETE NO ACTION` and only enforce tenant co-location at
+  insert/update. This sidesteps the composite-`SET NULL` trap (which would try
+  to null the `NOT NULL` `organization_id`); nullable refs are skipped via
+  MATCH SIMPLE. No constraints dropped.
+- Adversarial cross-tenant insert tests (task→foreign objective,
+  task_dependency edge, event→foreign objective, membership→foreign user) all
+  rejected at the DB; in-tenant sanity insert accepted. Migration `0005`
+  validated against throwaway PG (all 12 integration tests green).
+
+**Acceptance:** cross-tenant reference insert fails at the DB ✅; `projectIds`
+populated ✅; SEC-2's PROJECT case now enforced ✅; adversarial tests pass against
+live PG ✅.
+
+**Deps:** SEC-2 merged. **Migration:** new table (0004) + composite
+constraints (0005); migrator already runs on boot (PR #20).
 
 ---
 

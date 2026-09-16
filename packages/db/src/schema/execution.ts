@@ -1,6 +1,7 @@
 import { relations } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -8,6 +9,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -56,6 +58,29 @@ export const objectives = pgTable(
   (t) => [
     index('objectives_org_idx').on(t.organizationId),
     index('objectives_status_idx').on(t.organizationId, t.status),
+    // Composite tenancy key (SEC-3b): FK target for `(organization_id, id)`
+    // references from tasks and events.
+    unique('objectives_org_id_unique').on(t.organizationId, t.id),
+    // Cross-tenant integrity (SEC-3b): requester, owner, and project must belong
+    // to the objective's own organization. `no action` on delete leaves the
+    // existing single-column FKs owning any cascade / set-null behavior; these
+    // only reject an insert/update that crosses the tenant boundary. The
+    // project_id pair is skipped when project_id is null (MATCH SIMPLE).
+    foreignKey({
+      columns: [t.organizationId, t.requesterId],
+      foreignColumns: [users.organizationId, users.id],
+      name: 'objectives_org_requester_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.ownerId],
+      foreignColumns: [users.organizationId, users.id],
+      name: 'objectives_org_owner_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'objectives_org_project_fk',
+    }),
   ],
 );
 
@@ -106,6 +131,23 @@ export const tasks = pgTable(
     index('tasks_status_idx').on(t.organizationId, t.status),
     // Idempotency keys are unique per organization when present.
     index('tasks_idempotency_idx').on(t.organizationId, t.idempotencyKey),
+    // Composite tenancy key (SEC-3b): FK target for `(organization_id, id)`
+    // references from task_dependencies, events, and this table's parent link.
+    unique('tasks_org_id_unique').on(t.organizationId, t.id),
+    // Cross-tenant integrity (SEC-3b): a task's objective and parent task must
+    // belong to the task's own organization. `no action` on delete leaves the
+    // existing single-column FKs owning cascade / set-null; the parent_task_id
+    // pair is skipped when null (MATCH SIMPLE).
+    foreignKey({
+      columns: [t.organizationId, t.objectiveId],
+      foreignColumns: [objectives.organizationId, objectives.id],
+      name: 'tasks_org_objective_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.parentTaskId],
+      foreignColumns: [t.organizationId, t.id],
+      name: 'tasks_org_parent_fk',
+    }),
   ],
 );
 
@@ -126,6 +168,18 @@ export const taskDependencies = pgTable(
   (t) => [
     primaryKey({ columns: [t.taskId, t.dependsOnTaskId] }),
     index('task_deps_org_idx').on(t.organizationId),
+    // Cross-tenant integrity (SEC-3b): both edges of a dependency must belong to
+    // the dependency row's own organization (see tasks above for the rationale).
+    foreignKey({
+      columns: [t.organizationId, t.taskId],
+      foreignColumns: [tasks.organizationId, tasks.id],
+      name: 'task_deps_org_task_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.dependsOnTaskId],
+      foreignColumns: [tasks.organizationId, tasks.id],
+      name: 'task_deps_org_depends_fk',
+    }),
   ],
 );
 
@@ -162,6 +216,20 @@ export const events = pgTable(
     index('events_correlation_idx').on(t.correlationId),
     // Supports the outbox fetch: undispatched events, oldest first.
     index('events_undispatched_idx').on(t.dispatchedAt, t.createdAt),
+    // Cross-tenant integrity (SEC-3b): an event's objective and task must belong
+    // to the event's own organization. Both pairs are skipped when the ref is
+    // null (MATCH SIMPLE); `no action` leaves the single-column set-null FKs to
+    // own the delete behavior.
+    foreignKey({
+      columns: [t.organizationId, t.objectiveId],
+      foreignColumns: [objectives.organizationId, objectives.id],
+      name: 'events_org_objective_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.taskId],
+      foreignColumns: [tasks.organizationId, tasks.id],
+      name: 'events_org_task_fk',
+    }),
   ],
 );
 

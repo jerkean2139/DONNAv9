@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { foreignKey, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { roleEnum, scopeEnum } from './enums.js';
 
@@ -41,6 +41,9 @@ export const users = pgTable(
     unique('users_org_email_unique').on(t.organizationId, t.email),
     unique('users_external_auth_id_unique').on(t.externalAuthId),
     index('users_org_idx').on(t.organizationId),
+    // Composite tenancy key (SEC-3b): the target for `(organization_id, id)`
+    // foreign keys that co-locate a referencing row with its user's tenant.
+    unique('users_org_id_unique').on(t.organizationId, t.id),
   ],
 );
 
@@ -55,7 +58,11 @@ export const teams = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('teams_org_idx').on(t.organizationId)],
+  (t) => [
+    index('teams_org_idx').on(t.organizationId),
+    // Composite tenancy key (SEC-3b): FK target for `(organization_id, team_id)`.
+    unique('teams_org_id_unique').on(t.organizationId, t.id),
+  ],
 );
 
 /**
@@ -81,6 +88,21 @@ export const memberships = pgTable(
     unique('memberships_user_team_unique').on(t.userId, t.teamId),
     index('memberships_org_idx').on(t.organizationId),
     index('memberships_user_idx').on(t.userId),
+    // Cross-tenant integrity (SEC-3b): the member's user and team must belong to
+    // the membership's own organization. `no action` on delete so the existing
+    // single-column FKs keep owning the cascade / set-null behavior; these only
+    // reject an insert/update that points across the tenant boundary. The
+    // team_id pair is skipped when team_id is null (MATCH SIMPLE).
+    foreignKey({
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [users.organizationId, users.id],
+      name: 'memberships_org_user_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.teamId],
+      foreignColumns: [teams.organizationId, teams.id],
+      name: 'memberships_org_team_fk',
+    }),
   ],
 );
 
@@ -96,7 +118,11 @@ export const projects = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('projects_org_idx').on(t.organizationId)],
+  (t) => [
+    index('projects_org_idx').on(t.organizationId),
+    // Composite tenancy key (SEC-3b): FK target for `(organization_id, project_id)`.
+    unique('projects_org_id_unique').on(t.organizationId, t.id),
+  ],
 );
 
 /**
@@ -124,6 +150,18 @@ export const projectMemberships = pgTable(
     unique('project_memberships_project_user_unique').on(t.projectId, t.userId),
     index('project_memberships_org_idx').on(t.organizationId),
     index('project_memberships_user_idx').on(t.userId),
+    // Cross-tenant integrity (SEC-3b): the project and user must belong to the
+    // membership's own organization (see memberships above for the rationale).
+    foreignKey({
+      columns: [t.organizationId, t.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'project_memberships_org_project_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [users.organizationId, users.id],
+      name: 'project_memberships_org_user_fk',
+    }),
   ],
 );
 
