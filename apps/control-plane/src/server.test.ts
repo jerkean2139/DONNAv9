@@ -50,6 +50,31 @@ const otherOrgHeaders = {
   'x-donna-actor-kind': 'agent',
 };
 
+// A different user in the SAME organization — used for scope checks on reads.
+const sameOrgOtherUserHeaders = {
+  'x-donna-user-id': 'u2',
+  'x-donna-org-id': 'org1',
+  'x-donna-role': 'team_member',
+  'x-donna-actor-kind': 'agent',
+  'x-donna-teams': 'teamA',
+};
+
+/** Create an objective with an explicit scope as the given member. */
+async function createScoped(
+  app: ReturnType<typeof makeApp>['app'],
+  scope: string,
+  headers: Record<string, string> = memberHeaders,
+  extra: Record<string, unknown> = {},
+): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/objectives',
+    headers,
+    payload: { requestedOutcome: 'x', definitionOfDone: 'y', scope, ...extra },
+  });
+  return res.json().id as string;
+}
+
 describe('control-plane API', () => {
   it('reports health', async () => {
     const { app } = makeApp();
@@ -145,6 +170,74 @@ describe('control-plane API', () => {
       headers: otherOrgHeaders,
     });
     expect(cross.statusCode).toBe(404);
+  });
+
+  // SEC-2: scoped reads are authorized through the policy engine, not just the
+  // tenant filter. Unauthorized reads return 404 (never leak existence).
+  it('lets any same-org member read an ORGANIZATION-scoped objective', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'ORGANIZATION');
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: sameOrgOtherUserHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('lets the owner read their own PRIVATE objective', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'PRIVATE');
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('hides a PRIVATE objective from a different same-org user (404, no leak)', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'PRIVATE'); // owned by u1
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: sameOrgOtherUserHeaders, // u2, same org
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe('not_found');
+  });
+
+  it('does not grant an admin cross-user access to a PRIVATE objective', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'PRIVATE'); // owned by u1
+    const adminHeaders = {
+      'x-donna-user-id': 'admin1',
+      'x-donna-org-id': 'org1',
+      'x-donna-role': 'executive',
+      'x-donna-actor-kind': 'human',
+    };
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: adminHeaders,
+    });
+    // No role bypasses PRIVATE scope — reads stay fail-closed.
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('fails closed on a TEAM-scoped objective until the team binding is modeled (SEC-3)', async () => {
+    const { app } = makeApp();
+    // Created by a teamA member, but the objective does not yet carry its team,
+    // so the read cannot reconstruct TEAM membership → denied (404), even to the
+    // owner. SEC-3 surfaces the team binding to lift this.
+    const id = await createScoped(app, 'TEAM', memberHeaders, { teamId: 'teamA' });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it('dispatches a task: creates it, enqueues a work order, emits task.created', async () => {

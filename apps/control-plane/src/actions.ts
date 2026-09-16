@@ -14,6 +14,18 @@ export const OBJECTIVE_CREATE_ACTION: ActionDescriptor = {
 };
 
 /**
+ * Reading an objective is Observe-level (the lowest authority) and never
+ * side-effecting. The meaningful gate for a read is the resource's scope — the
+ * policy engine denies a PRIVATE objective to anyone but its owner, a TEAM/
+ * PROJECT objective to non-members, and any resource across the tenant boundary.
+ */
+export const OBJECTIVE_READ_ACTION: ActionDescriptor = {
+  name: 'objective.read',
+  authorityLevel: AUTHORITY_LEVELS.OBSERVE,
+  sideEffecting: false,
+};
+
+/**
  * Dispatching a task creates the durable task and enqueues a work order for the
  * orchestrator to route. Dispatch itself is Prepare-level and non-side-effecting
  * — it schedules planning/execution, it does not perform the outward action. The
