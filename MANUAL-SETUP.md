@@ -266,17 +266,20 @@ test location first.
 DONNA runs as **two processes**, so you need **two Railway services** in the same
 project, both deploying this repo:
 
-| Service | Runs                                                  | Config file (set in service → Settings → **Config File**) |
+| Service | Runs                                                  | Config file                                               |
 | ------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| API     | the control-plane (HTTP API, migrates the DB on boot) | `railway.control-plane.json`                              |
-| Worker  | the worker (processes queued jobs)                    | `railway.worker.json`                                     |
+| API     | the control-plane (HTTP API, migrates the DB on boot) | `railway.json` (the repo-root default — nothing to set)   |
+| Worker  | the worker (processes queued jobs)                    | `railway.worker.json` (set in Settings → **Config File**) |
 
-Those two committed config files pin the build command (`pnpm run build`), the
-start command (`pnpm --filter @donna/<app> start`), and — for the API — the
-`/health` healthcheck. Without a config file Railway's autodetect fails on this
-monorepo (`No start command detected`), so **point each service at its file** in
-**Settings → Config File** (a.k.a. "Railway Config File" / config-as-code path).
-Leave **Root Directory** at the repo root `/` for both.
+The committed config files pin the build command (`pnpm run build`), the start
+command (`pnpm --filter @donna/<app> start`), and the `/health` healthcheck.
+Railway auto-applies the root **`railway.json`** to any service that has no
+explicit Config File, so the **API service needs no Config File setting** — it
+uses the root default. The **worker** must point its **Settings → Config File**
+at `railway.worker.json` (otherwise it would inherit the root/control-plane
+config). Leave **Root Directory** at the repo root `/` for both. Without the
+right config Railway's autodetect fails on this monorepo
+(`No start command detected`).
 
 Then, in each service → **Variables**, set what that service needs:
 
