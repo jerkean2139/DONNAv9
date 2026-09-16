@@ -29,8 +29,11 @@ you set locally — gives the **Windows PowerShell** command to set it.
 - **In production** — set the same variables in **Railway** → your service →
   **Variables** tab. Never commit any of these to the repo.
 
-The apps degrade gracefully when a variable is missing (they log a warning and
-fall back to a dev/in-memory mode), so you can bring them online one at a time.
+Outside production the apps degrade gracefully when a variable is missing (they
+log a warning and fall back to a dev/in-memory mode), so you can bring them
+online one at a time. **In production the control-plane fails closed** — see the
+SEC-1 note in §3 — so set `APP_ENV=development` while you're still wiring things
+up, then switch to production once the full config is in place.
 
 ---
 
@@ -142,9 +145,23 @@ $env:LOCAL_MODEL_API_KEY = "not-needed"   # optional
 
 ## 3. Production auth (Clerk) — JWT verification
 
-DONNA verifies Clerk-issued JWTs against Clerk's public JWKS. If
-`AUTH_JWKS_URL` is unset, the control-plane falls back to the **dev header
-shim** (logs a loud warning — never use it in production).
+DONNA verifies Clerk-issued JWTs against Clerk's public JWKS.
+
+> ⚠️ **Fail-closed in production (SEC-1).** The control-plane treats itself as
+> **production unless `APP_ENV` is `development` or `test`**. In production it
+> **refuses to start** — exits before serving — unless ALL of these are set:
+> `DATABASE_URL`, `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`,
+> `AUTH_REQUIRE_MFA=true`, and `CLERK_WEBHOOK_SECRET`. The dev header shim and
+> the in-memory stores never back production.
+>
+> **For early bring-up before Clerk is configured:** set `APP_ENV=development`
+> on the Railway service. That restores the permissive behavior (durable when
+> `DATABASE_URL` is set, header shim when JWKS is absent) so you can smoke-test
+> the deploy. Remove `APP_ENV` (or set it to `production`) and supply the full
+> config above before real traffic.
+
+When the dev shim is active it logs a loud warning — never rely on it in
+production.
 
 ### 3a. Environment variables
 
@@ -278,23 +295,24 @@ editor type `${{` and pick your Postgres service's `DATABASE_URL` (it becomes
 
 ## Quick reference — every environment variable
 
-| Variable               | Service       | Required                | Source                                        |
-| ---------------------- | ------------- | ----------------------- | --------------------------------------------- |
-| `DATABASE_URL`         | both          | for durability          | Railway Postgres                              |
-| `ANTHROPIC_API_KEY`    | worker        | for AI                  | console.anthropic.com                         |
-| `OPENAI_API_KEY`       | worker        | optional (OpenAI)       | platform.openai.com/api-keys                  |
-| `OPENAI_BASE_URL`      | worker        | optional                | OpenAI-compatible proxy URL                   |
-| `LOCAL_MODEL_BASE_URL` | worker        | optional (local model)  | your local server, e.g. Ollama `/v1`          |
-| `LOCAL_MODEL_API_KEY`  | worker        | optional                | only if your local server enforces one        |
-| `AUTH_JWKS_URL`        | control-plane | for prod auth           | Clerk Frontend API + `/.well-known/jwks.json` |
-| `AUTH_ISSUER`          | control-plane | recommended             | Clerk Frontend API URL                        |
-| `AUTH_AUDIENCE`        | control-plane | optional                | your API audience                             |
-| `AUTH_REQUIRE_MFA`     | control-plane | optional                | `"true"` to enforce                           |
-| `AUTH_MFA_CLAIM`       | control-plane | optional                | claim name you added in Clerk                 |
-| `CLERK_WEBHOOK_SECRET` | control-plane | for provisioning        | Clerk → Webhooks → Signing Secret             |
-| `GHL_TOKEN`            | worker        | for CRM                 | GoHighLevel API                               |
-| `GHL_LOCATION_ID`      | worker        | optional                | GoHighLevel sub-account id                    |
-| `PORT`                 | control-plane | optional (default 3000) | you choose                                    |
+| Variable               | Service       | Required                                     | Source                                        |
+| ---------------------- | ------------- | -------------------------------------------- | --------------------------------------------- |
+| `DATABASE_URL`         | both          | for durability                               | Railway Postgres                              |
+| `ANTHROPIC_API_KEY`    | worker        | for AI                                       | console.anthropic.com                         |
+| `OPENAI_API_KEY`       | worker        | optional (OpenAI)                            | platform.openai.com/api-keys                  |
+| `OPENAI_BASE_URL`      | worker        | optional                                     | OpenAI-compatible proxy URL                   |
+| `LOCAL_MODEL_BASE_URL` | worker        | optional (local model)                       | your local server, e.g. Ollama `/v1`          |
+| `LOCAL_MODEL_API_KEY`  | worker        | optional                                     | only if your local server enforces one        |
+| `APP_ENV`              | control-plane | prod default; set `development` for bring-up | you choose                                    |
+| `AUTH_JWKS_URL`        | control-plane | required in prod                             | Clerk Frontend API + `/.well-known/jwks.json` |
+| `AUTH_ISSUER`          | control-plane | required in prod                             | Clerk Frontend API URL                        |
+| `AUTH_AUDIENCE`        | control-plane | required in prod                             | your API audience                             |
+| `AUTH_REQUIRE_MFA`     | control-plane | required in prod (`"true"`)                  | `"true"` to enforce                           |
+| `AUTH_MFA_CLAIM`       | control-plane | optional                                     | claim name you added in Clerk                 |
+| `CLERK_WEBHOOK_SECRET` | control-plane | required in prod                             | Clerk → Webhooks → Signing Secret             |
+| `GHL_TOKEN`            | worker        | for CRM                                      | GoHighLevel API                               |
+| `GHL_LOCATION_ID`      | worker        | optional                                     | GoHighLevel sub-account id                    |
+| `PORT`                 | control-plane | optional (default 3000)                      | you choose                                    |
 
 ---
 
