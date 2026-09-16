@@ -38,6 +38,8 @@ export function objectiveToRow(objective: Objective, organizationId: string): Ob
     status: objective.status,
     riskLevel: objective.riskLevel,
     ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
+    // scope_ref points at the owning team for a TEAM-scoped objective.
+    ...(objective.teamId !== undefined ? { scopeRef: objective.teamId } : {}),
     ...(objective.dueAt !== undefined ? { dueAt: objective.dueAt } : {}),
     ...(objective.completionSummary !== undefined
       ? { completionSummary: objective.completionSummary }
@@ -57,6 +59,8 @@ export function rowToObjective(row: ObjectiveRow): Objective {
     status: row.status as ObjectiveStatus,
     riskLevel: row.riskLevel as RiskLevel,
     ...(row.projectId !== null ? { projectId: row.projectId as ProjectId } : {}),
+    // Surface the team binding only for TEAM scope (scope_ref is scope-specific).
+    ...(row.scope === 'TEAM' && row.scopeRef !== null ? { teamId: row.scopeRef } : {}),
     ...(row.dueAt !== null ? { dueAt: row.dueAt } : {}),
     ...(row.completionSummary !== null ? { completionSummary: row.completionSummary } : {}),
   };

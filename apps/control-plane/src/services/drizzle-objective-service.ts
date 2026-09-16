@@ -32,6 +32,7 @@ export class DrizzleObjectiveService implements ObjectiveService {
       status: 'draft',
       riskLevel: input.riskLevel,
       ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+      ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
     };
     const event = createEvent({
       type: 'objective.created',

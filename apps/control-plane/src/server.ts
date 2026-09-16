@@ -139,6 +139,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         scope,
         riskLevel: body.riskLevel ?? 'low',
         ...(body.projectId !== undefined ? { projectId: body.projectId } : {}),
+        ...(body.teamId !== undefined ? { teamId: body.teamId } : {}),
       },
       principal,
     );
@@ -168,6 +169,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       scope: objective.scope,
       ownerUserId: objective.ownerId,
       ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
+      ...(objective.teamId !== undefined ? { teamId: objective.teamId } : {}),
     };
     const decision = evaluate({ principal, action: OBJECTIVE_READ_ACTION, resource });
     if (decision.effect !== 'allow') {

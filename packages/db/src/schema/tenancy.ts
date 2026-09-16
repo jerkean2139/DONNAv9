@@ -99,11 +99,49 @@ export const projects = pgTable(
   (t) => [index('projects_org_idx').on(t.organizationId)],
 );
 
+/**
+ * Project membership links a user to a project they may access. Distinct from
+ * team/org membership: the policy engine consumes it as `principal.projectIds`
+ * to authorize PROJECT-scoped resources (Technical Plan §6). Unique per
+ * (project, user) so a user joins a project at most once.
+ */
+export const projectMemberships = pgTable(
+  'project_memberships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('project_memberships_project_user_unique').on(t.projectId, t.userId),
+    index('project_memberships_org_idx').on(t.organizationId),
+    index('project_memberships_user_idx').on(t.userId),
+  ],
+);
+
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
   teams: many(teams),
   memberships: many(memberships),
   projects: many(projects),
+  projectMemberships: many(projectMemberships),
+}));
+
+export const projectMembershipsRelations = relations(projectMemberships, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [projectMemberships.organizationId],
+    references: [organizations.id],
+  }),
+  project: one(projects, { fields: [projectMemberships.projectId], references: [projects.id] }),
+  user: one(users, { fields: [projectMemberships.userId], references: [users.id] }),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({

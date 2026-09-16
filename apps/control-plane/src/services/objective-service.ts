@@ -18,6 +18,8 @@ export interface CreateObjectiveInput {
   readonly scope: Scope;
   readonly riskLevel: RiskLevel;
   readonly projectId?: ProjectId;
+  /** Owning team for a TEAM-scoped objective (persisted as `scope_ref`). */
+  readonly teamId?: string;
 }
 
 export interface ObjectiveService {
@@ -57,6 +59,7 @@ export class InMemoryObjectiveService implements ObjectiveService {
       status: 'draft',
       riskLevel: input.riskLevel,
       ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+      ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
     };
     this.store.set(id, { objective, organizationId: principal.organizationId });
 
