@@ -226,18 +226,81 @@ describe('control-plane API', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it('fails closed on a TEAM-scoped objective until the team binding is modeled (SEC-3)', async () => {
+  // SEC-3a: the objective now carries its owning team (persisted as scope_ref),
+  // so a TEAM-scoped read can reconstruct membership and authorize any member of
+  // that team — not just the owner.
+  it('lets a fellow team member read a TEAM-scoped objective', async () => {
     const { app } = makeApp();
-    // Created by a teamA member, but the objective does not yet carry its team,
-    // so the read cannot reconstruct TEAM membership → denied (404), even to the
-    // owner. SEC-3 surfaces the team binding to lift this.
     const id = await createScoped(app, 'TEAM', memberHeaders, { teamId: 'teamA' });
+    // u2 is a different user in org1 who is also on teamA.
     const res = await app.inject({
       method: 'GET',
       url: `/objectives/${id}`,
-      headers: memberHeaders,
+      headers: sameOrgOtherUserHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('hides a TEAM-scoped objective from a same-org non-member (404, no leak)', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'TEAM', memberHeaders, { teamId: 'teamA' });
+    // u3 is in org1 but on teamB, not teamA.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: {
+        'x-donna-user-id': 'u3',
+        'x-donna-org-id': 'org1',
+        'x-donna-role': 'team_member',
+        'x-donna-actor-kind': 'agent',
+        'x-donna-teams': 'teamB',
+      },
     });
     expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe('not_found');
+  });
+
+  // SEC-3a: PROJECT-scoped reads authorize members of the project, read from the
+  // principal's projectIds (in dev via the x-donna-projects header; in
+  // production from the project_memberships table).
+  it('lets a project member read a PROJECT-scoped objective', async () => {
+    const { app } = makeApp();
+    // Owner u1 is a member of projP (required to create a PROJECT-scoped
+    // objective there); the reader u4 is a different member of the same project.
+    const ownerInProjP = { ...memberHeaders, 'x-donna-projects': 'projP' };
+    const id = await createScoped(app, 'PROJECT', ownerInProjP, { projectId: 'projP' });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: {
+        'x-donna-user-id': 'u4',
+        'x-donna-org-id': 'org1',
+        'x-donna-role': 'team_member',
+        'x-donna-actor-kind': 'agent',
+        'x-donna-projects': 'projP',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('hides a PROJECT-scoped objective from a same-org non-member (404, no leak)', async () => {
+    const { app } = makeApp();
+    const ownerInProjP = { ...memberHeaders, 'x-donna-projects': 'projP' };
+    const id = await createScoped(app, 'PROJECT', ownerInProjP, { projectId: 'projP' });
+    // u5 is in org1 but a member of a different project.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}`,
+      headers: {
+        'x-donna-user-id': 'u5',
+        'x-donna-org-id': 'org1',
+        'x-donna-role': 'team_member',
+        'x-donna-actor-kind': 'agent',
+        'x-donna-projects': 'projOther',
+      },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe('not_found');
   });
 
   it('dispatches a task: creates it, enqueues a work order, emits task.created', async () => {

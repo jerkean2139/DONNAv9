@@ -26,6 +26,11 @@ export interface Objective {
   readonly status: ObjectiveStatus;
   readonly riskLevel: RiskLevel;
   readonly projectId?: ProjectId;
+  /**
+   * The owning team for a TEAM-scoped objective (persisted as `scope_ref`).
+   * Surfaced so scope authorization can check team membership at read time.
+   */
+  readonly teamId?: string;
   readonly dueAt?: Date;
   readonly completionSummary?: string;
 }

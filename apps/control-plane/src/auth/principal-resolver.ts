@@ -48,13 +48,26 @@ export class DrizzlePrincipalResolver implements PrincipalResolver {
 
     const teamIds = memberships.map((m) => m.teamId).filter((t): t is string => t !== null);
 
+    // Project access comes from OUR database, not the token (least privilege):
+    // the projects this user is a member of, scoped to their organization.
+    const projectRows = await this.db
+      .select({ projectId: schema.projectMemberships.projectId })
+      .from(schema.projectMemberships)
+      .where(
+        and(
+          eq(schema.projectMemberships.userId, user.id),
+          eq(schema.projectMemberships.organizationId, user.organizationId),
+        ),
+      );
+    const projectIds = projectRows.map((r) => r.projectId);
+
     return {
       userId: user.id,
       organizationId: user.organizationId,
       role: primary.role as Role,
       actorKind: 'human',
       teamIds,
-      projectIds: [],
+      projectIds,
     };
   }
 }

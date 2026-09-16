@@ -105,6 +105,36 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect(await resolver.resolve({ subject: 'nobody', claims: { sub: 'nobody' } })).toBeNull();
   });
 
+  it('populates principal.projectIds from project_memberships (SEC-3a)', async () => {
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const projectId = randomUUID();
+    const sub = `user_${randomUUID().slice(0, 8)}`;
+    await db.insert(schema.organizations).values({ id: organizationId, name: 'Acme', slug: sub });
+    await db.insert(schema.users).values({
+      id: userId,
+      organizationId,
+      email: `${userId}@x.com`,
+      displayName: 'Test',
+      externalAuthId: sub,
+    });
+    await db
+      .insert(schema.memberships)
+      .values({ organizationId, userId, teamId: null, role: 'team_member' });
+    await db
+      .insert(schema.projects)
+      .values({ id: projectId, organizationId, name: 'Route 40', scope: 'PROJECT' });
+    await db.insert(schema.projectMemberships).values({ organizationId, projectId, userId });
+
+    const principal = await new DrizzlePrincipalResolver(db).resolve({
+      subject: sub,
+      claims: { sub },
+    });
+    expect(principal).not.toBeNull();
+    // Project access comes from OUR database, scoped to the user's org.
+    expect(principal!.projectIds).toEqual([projectId]);
+  });
+
   it('provisions org + user + membership from a Clerk membership event, then resolves', async () => {
     const suffix = randomUUID().slice(0, 8);
     const clerkOrgId = `org_${suffix}`;
