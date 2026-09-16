@@ -13,6 +13,8 @@ same core files (`main.ts`, `server.ts`, `worker.ts`, `orchestrator.ts`, the
 schema) and would conflict badly in parallel. I renamed them **SEC-1..SEC-6** so
 they don't collide with the already-merged GitHub PRs #20 (auto-migration) and
 #21 (Railway config) — the audit's "PR #20–#24" numbering predates those.
+Governance wiring is split into its own **SEC-7** (approved) so idempotency
+(SEC-6) lands clean.
 
 ---
 
@@ -194,11 +196,10 @@ full-path integration tests.
 
 ---
 
-### SEC-6 — Transactional idempotency + governance wiring
+### SEC-6 — Transactional idempotency
 
 **Problem:** non-unique key index; unused idempotency table; key never reaches
-adapters; kill switches / approval lifecycle / approver eligibility / policy
-audit not wired to execution.
+adapters.
 
 **Design:**
 
@@ -208,16 +209,30 @@ audit not wired to execution.
   concurrent duplicates via the unique constraint.
 - Thread the key through `WorkOrder` → `ExecutionContext` (the HTTP/GHL adapters
   already emit `Idempotency-Key` once ctx carries it).
-- Governance: connect kill switches (deny at the gate), approval
-  creation/consumption + approver eligibility + exact approval scope, and policy
-  audit records, to execution.
 
 **Acceptance:** concurrent duplicates → one side effect; crash-after-provider-
 call doesn't repeat it; Graphile retry keeps the key; GHL/side-effect adapter
-tests; kill switch blocks execution; approval consumed exactly once; audit row
-written per decision; migration + rollback documented.
+tests; migration + rollback documented.
 
 **Deps:** SEC-5 merged.
+
+---
+
+### SEC-7 — Governance wiring
+
+**Problem:** kill switches, approval lifecycle, approver eligibility, exact
+approval scope, and policy audit records are not connected to execution.
+
+**Design:** connect kill switches (deny at the gate), approval
+creation/consumption + approver eligibility + exact approval scope, and policy
+audit records, to the execution path.
+
+**Acceptance:** kill switch blocks execution; approval consumed exactly once;
+approver eligibility enforced; audit row written per decision; migration +
+rollback documented.
+
+**Deps:** SEC-6 merged. Split out from SEC-6 (approved) so idempotency lands
+clean and governance gets its own focused PR.
 
 ---
 

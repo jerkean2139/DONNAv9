@@ -6,6 +6,7 @@ import { createRemoteJWKSet } from 'jose';
 import { devAuthenticator, jwtAuthenticator, type Authenticator } from './auth/authenticate.js';
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
 import { verifyToken, type VerifierConfig } from './auth/token-verifier.js';
+import { resolveStartupConfig, type StartupConfig } from './runtime-config.js';
 import { buildServer, type ServerDeps } from './server.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { InMemoryObjectiveService } from './services/objective-service.js';
@@ -20,25 +21,30 @@ import { SvixWebhookVerifier } from './webhooks/clerk-verify.js';
 import { DrizzleProvisioningService } from './webhooks/provisioning.js';
 
 /**
- * Build the request authenticator (Technical Plan §6/§8). When `AUTH_JWKS_URL`
- * is set (and a database is available for the principal lookup), production JWT
- * auth is used: the provider (Clerk) owns login + MFA, we verify the token and
- * derive the principal from our tables. Otherwise the dev header shim, with a
- * loud warning — never rely on it in production. Secrets/URLs come from the
- * environment, never source.
+ * Build the request authenticator (Technical Plan §6/§8). Production always
+ * resolves to JWT verification (Clerk owns login + MFA; we verify the token and
+ * derive the principal from our own tables) — the development header shim, which
+ * trusts caller-supplied identity, is only ever selected outside production and
+ * announces itself. Secrets/URLs come from the environment, never source.
  */
-function buildAuthenticator(db: DonnaDatabase | undefined): Authenticator {
-  const jwksUrl = process.env.AUTH_JWKS_URL;
-  if (jwksUrl === undefined || jwksUrl === '' || db === undefined) {
-    console.warn('AUTH_JWKS_URL not set — using the dev header shim (NOT production auth).');
+function buildAuthenticator(
+  auth: StartupConfig['auth'],
+  db: DonnaDatabase | undefined,
+): Authenticator {
+  if (auth.kind === 'dev-shim') {
+    console.warn('Auth: using the development header shim (NOT production auth).');
     return devAuthenticator();
   }
+  if (db === undefined) {
+    // Unreachable: JWT auth is only selected when a database is available.
+    throw new Error('JWT authentication requires a database for principal resolution.');
+  }
   const config: VerifierConfig = {
-    key: createRemoteJWKSet(new URL(jwksUrl)),
-    ...(process.env.AUTH_ISSUER !== undefined ? { issuer: process.env.AUTH_ISSUER } : {}),
-    ...(process.env.AUTH_AUDIENCE !== undefined ? { audience: process.env.AUTH_AUDIENCE } : {}),
-    requireMfa: process.env.AUTH_REQUIRE_MFA === 'true',
-    ...(process.env.AUTH_MFA_CLAIM !== undefined ? { mfaClaim: process.env.AUTH_MFA_CLAIM } : {}),
+    key: createRemoteJWKSet(new URL(auth.jwksUrl)),
+    ...(auth.issuer !== undefined ? { issuer: auth.issuer } : {}),
+    ...(auth.audience !== undefined ? { audience: auth.audience } : {}),
+    requireMfa: auth.requireMfa,
+    ...(auth.mfaClaim !== undefined ? { mfaClaim: auth.mfaClaim } : {}),
   };
   return jwtAuthenticator({
     verify: (token) => verifyToken(token, config),
@@ -47,40 +53,49 @@ function buildAuthenticator(db: DonnaDatabase | undefined): Authenticator {
 }
 
 /**
- * Process entrypoint. With `DATABASE_URL` set, the API is durable: objectives
- * and tasks persist to Postgres and their events + jobs go through the
- * transactional outbox. Without it, the in-memory services back local runs (no
- * durability). The connection string comes from the environment / secrets
- * manager, never from source (§8).
+ * Process entrypoint. Resolve the startup configuration first and FAIL CLOSED:
+ * in production, a missing required variable exits the process (naming the
+ * variable, never its value) before the HTTP listener opens — the dev header
+ * shim and the non-durable in-memory stores never back production (SEC-1). In
+ * development/test the durable path is used when configured, otherwise the local
+ * shim. Secrets come from the environment / secrets manager, never source (§8).
  */
-const connectionString = process.env.DATABASE_URL;
+const resolution = resolveStartupConfig(process.env);
+if (!resolution.ok) {
+  console.error(
+    `Refusing to start in production: missing required configuration — ${resolution.missing.join(', ')}. ` +
+      `Set these (see MANUAL-SETUP.md) or run with APP_ENV=development to use the local header shim.`,
+  );
+  process.exit(1);
+}
+const config = resolution.config;
 
 let deps: ServerDeps;
-if (connectionString !== undefined && connectionString !== '') {
+if (config.databaseUrl !== undefined) {
   // Apply the schema on boot so a deploy with DATABASE_URL set fully prepares
   // the database with no terminal step (§16): the application schema (Drizzle)
   // and graphile-worker's queue schema, the latter so the dispatcher's
   // transactional `add_job` resolves even if the worker has not booted yet.
-  await runDrizzleMigrations(connectionString);
-  await runMigrations({ connectionString });
-  const db = createDatabase(connectionString);
-  const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
+  await runDrizzleMigrations(config.databaseUrl);
+  await runMigrations({ connectionString: config.databaseUrl });
+  const db = createDatabase(config.databaseUrl);
   deps = {
     objectiveService: new DrizzleObjectiveService(db),
     taskDispatcher: new DrizzleTaskDispatcher(db),
-    authenticate: buildAuthenticator(db),
-    // The provisioning webhook needs a database; wire it only when its signing
-    // secret is set (from the Clerk dashboard, via the environment — §8).
-    ...(webhookSecret !== undefined && webhookSecret !== ''
+    authenticate: buildAuthenticator(config.auth, db),
+    // In production the signing secret is required, so the provisioning webhook
+    // is always wired; in development it is wired only when the secret is set.
+    ...(config.webhookSecret !== undefined
       ? {
           clerkWebhook: {
-            verifier: new SvixWebhookVerifier(webhookSecret),
+            verifier: new SvixWebhookVerifier(config.webhookSecret),
             provisioning: new DrizzleProvisioningService(db),
           },
         }
       : {}),
   };
 } else {
+  // Only reachable outside production — production guarantees a database.
   console.warn('DATABASE_URL not set — using in-memory services (state is not durable).');
   const bus = new InMemoryEventBus();
   const taskService = new InMemoryTaskService(bus);
@@ -91,7 +106,7 @@ if (connectionString !== undefined && connectionString !== '') {
   deps = {
     objectiveService: new InMemoryObjectiveService(bus),
     taskDispatcher,
-    authenticate: buildAuthenticator(undefined),
+    authenticate: buildAuthenticator(config.auth, undefined),
   };
 }
 
