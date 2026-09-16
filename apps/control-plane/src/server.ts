@@ -3,7 +3,7 @@ import type { WorkOrder } from '@donna/orchestrator';
 import { evaluate, type ResourceDescriptor } from '@donna/policy';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { OBJECTIVE_CREATE_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
+import { OBJECTIVE_CREATE_ACTION, OBJECTIVE_READ_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
 import type { Authenticator } from './auth/authenticate.js';
 import { ClerkPayloadError, parseClerkEvent } from './webhooks/clerk-events.js';
 import { WebhookVerificationError, type WebhookVerifier } from './webhooks/clerk-verify.js';
@@ -158,6 +158,22 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (objective === null) {
       return reply.code(404).send({ error: 'not_found' });
     }
+
+    // Scope authorization (SEC-2): the same central policy the mutations use. A
+    // PRIVATE objective is owner-only; TEAM/PROJECT are member-only. An
+    // unauthorized resource reads as `not_found` — identical to a missing one —
+    // so a caller can't probe for the existence of objectives they can't see.
+    const resource: ResourceDescriptor = {
+      organizationId: principal.organizationId,
+      scope: objective.scope,
+      ownerUserId: objective.ownerId,
+      ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
+    };
+    const decision = evaluate({ principal, action: OBJECTIVE_READ_ACTION, resource });
+    if (decision.effect !== 'allow') {
+      return reply.code(404).send({ error: 'not_found' });
+    }
+
     return objective;
   });
 
