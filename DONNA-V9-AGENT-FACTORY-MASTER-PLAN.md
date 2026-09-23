@@ -1,8 +1,8 @@
 # DONNA V9 — AGENT FACTORY MASTER PLAN
 
-**Repository:** `jerkean2139/DONNAv9`  
-**Baseline audited:** `b255262bf51843eab762c257955107232f8e0014`  
-**Plan branch:** `plan/agent-factory-master-plan`  
+**Repository:** `jerkean2139/DONNAv9`
+**Baseline audited:** `b255262bf51843eab762c257955107232f8e0014`
+**Plan branch:** `plan/agent-factory-master-plan`
 **Status:** Governing implementation plan. No production deployment or destructive migration is authorized by this document.
 
 ## 1. Executive decision
