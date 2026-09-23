@@ -1,9 +1,9 @@
 # Repository structure
 
-The target monorepo layout from the Technical Plan §2. Packages/apps are added
-as their phase lands (plan §18) — this document is the map; only what a phase
-needs is created, so the tree below is partly aspirational and marked per
-phase.
+The repository layout began from Technical Plan §2 and is now evolving under
+ADR-0004 and the Agent Factory Master Plan. Entries marked planned are not yet
+implemented; check the repository rather than treating this tree as proof that
+code exists.
 
 ```
 DONNAv9/
@@ -30,7 +30,8 @@ DONNAv9/
 │  ├─ context/        # Phase 4 ✅ Context Packet builder + budgeting
 │  ├─ memory/         # Phase 6 — semantic memory adapter (pgvector)
 │  ├─ knowledge/      # Phase 6 — source ingestion + provenance
-│  ├─ skills/         # Phase 8 — Skill Registry + SOP promotion
+│  ├─ skills/         # Agent Factory plan — Skills 2.0 registry (planned)
+│  ├─ agent-factory/  # Agent Factory plan — AgentSpec compiler (planned)
 │  ├─ telemetry/      # Phase 4+ — OpenTelemetry + Donna Health
 │  ├─ config/         # Phase 4 ✅ model registry, pricing, feature flags
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
