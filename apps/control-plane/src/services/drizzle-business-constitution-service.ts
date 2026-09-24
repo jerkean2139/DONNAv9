@@ -33,7 +33,9 @@ export class DrizzleBusinessConstitutionService {
   ): Promise<ConstitutionProposal> {
     return this.db.transaction(async (tx) => {
       const [versionRow] = await tx.execute(
-        sql.raw("select coalesce(max(version), 0)::int + 1 as version from business_constitutions where organization_id = '" + organizationId.replaceAll("'", "''") + "'"),
+        sql`select coalesce(max(version), 0)::int + 1 as version
+            from business_constitutions
+            where organization_id = ${organizationId}`,
       );
       const version = Number(versionRow!.version);
       const [constitution] = await tx
