@@ -1,7 +1,7 @@
 # Repository structure
 
 The repository layout began from Technical Plan §2 and is now evolving under
-ADR-0004 and the Agent Factory Master Plan. Entries marked planned are not yet
+ADR-0004, ADR-0005, and the Agent Factory Master Plan. Entries marked planned are not yet
 implemented; check the repository rather than treating this tree as proof that
 code exists.
 
@@ -28,10 +28,12 @@ DONNAv9/
 │  ├─ model-router/   # Phase 4 ✅ model/node selection + fallback
 │  ├─ cost-governor/  # Phase 4 ✅ budgets, usage ledger, model evaluation
 │  ├─ context/        # Phase 4 ✅ Context Packet builder + budgeting
-│  ├─ memory/         # Phase 6 — semantic memory adapter (pgvector)
-│  ├─ knowledge/      # Phase 6 — source ingestion + provenance
-│  ├─ skills/         # Agent Factory plan — Skills 2.0 registry (planned)
-│  ├─ agent-factory/  # Agent Factory plan — AgentSpec compiler (planned)
+│  ├─ memory/         # v9 Phase 2 — persistent layered memory + lifecycle (planned)
+│  ├─ knowledge/      # v9 Phase 2 — source ingestion + provenance (planned)
+│  ├─ learning/       # v9 Phase 3 — policy-gated learning engine (planned)
+│  ├─ skills/         # v9 Phase 4 — Skills 2.0 + Marketplace contracts (planned)
+│  ├─ integration-registry/ # v9 Phase 5 — APIs/MCP/connectors/tool manifests (planned)
+│  ├─ agent-factory/  # v9 Phase 6 — AgentSpec compiler (planned)
 │  ├─ telemetry/      # Phase 4+ — OpenTelemetry + Donna Health
 │  ├─ config/         # Phase 4 ✅ model registry, pricing, feature flags
 │  ├─ security/       # Phase 3+ — untrusted-data tagging, injection guards
@@ -44,6 +46,7 @@ DONNAv9/
 │     ├─ model-openai/  model-local/
 │     ├─ github/  browser/  research/  fathom/  slack/
 │     ├─ gmail/  drive/  ghl-zenoflo/  lead-builder/
+│     ├─ marketplace-github/ # approved KOB Marketplace skill/capability import
 │     └─ coding-agent/  automation-mcp/
 │
 ├─ infra/
@@ -67,3 +70,13 @@ DONNAv9/
 - `packages/core-domain` stays dependency-free (no `@donna/*`, no SDKs).
 - `apps/web` may not import `@donna/db` or `@donna/policy` — it calls the
   control-plane API.
+
+
+## Planned v9 architectural boundaries
+
+- `memory` owns lifecycle-aware persistent memory, not authoritative business state.
+- `learning` proposes evidence-backed changes; it cannot grant authority or silently rewrite policy.
+- `integration-registry` describes capabilities; adapters execute them; `policy` authorizes them.
+- Marketplace content is candidate capability content until validated and approved.
+- Voice, chat, desktop/PWA, and API share the same control plane, memory, and authority model.
+- Client archive state is excluded from normal active retrieval and revalidated before reactivation.
