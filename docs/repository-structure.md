@@ -1,9 +1,8 @@
 # Repository structure
 
-The repository layout began from Technical Plan §2 and is now evolving under
-ADR-0004, ADR-0005, and the Agent Factory Master Plan. Entries marked planned are not yet
-implemented; check the repository rather than treating this tree as proof that
-code exists.
+The repository layout began from Technical Plan §2 and is now evolving under ADR-0004, ADR-0005, and
+the Agent Factory Master Plan. Entries marked planned are not yet implemented; check the repository
+rather than treating this tree as proof that code exists.
 
 ```
 DONNAv9/
@@ -70,7 +69,6 @@ DONNAv9/
 - `packages/core-domain` stays dependency-free (no `@donna/*`, no SDKs).
 - `apps/web` may not import `@donna/db` or `@donna/policy` — it calls the
   control-plane API.
-
 
 ## Planned v9 architectural boundaries
 
