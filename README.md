@@ -17,10 +17,19 @@ The approved design is [`GREENFIELD-V2-TECHNICAL-PLAN.md`](./GREENFIELD-V2-TECHN
 
 ## Status
 
-**Phase 0 — foundation scaffolding.** Monorepo tooling, CI boundary rules, the
-pure `@donna/core-domain` package (types + durable Task state machine), a dev
-Postgres+pgvector, env/secret conventions, and the ADR log. No product
-behavior yet. Roadmap: Technical Plan §18.
+**Control-plane foundation implemented; Agent Factory evolution in Phase 0
+baseline/reconciliation.**
+
+The repository now contains the web, control-plane, worker, Postgres/Drizzle
+schema and migrations, deterministic policy/approvals, Work Router, Model Router,
+orchestrator, Context Packets, cost controls, events/outbox, provider adapters,
+GHL integration, Clerk-oriented authentication, Railway deployment, and
+schema-level tenant protections.
+
+The next architecture is governed by
+[`DONNA-V9-AGENT-FACTORY-MASTER-PLAN.md`](./DONNA-V9-AGENT-FACTORY-MASTER-PLAN.md).
+See [`docs/PHASE-0-BASELINE.md`](./docs/PHASE-0-BASELINE.md) for the verified
+pre-Agent-Factory baseline.
 
 ## Prerequisites
 

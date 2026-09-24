@@ -7,6 +7,8 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
+import { DrizzleBusinessConstitutionService } from './services/drizzle-business-constitution-service.js';
+import { DrizzleBusinessGraphService } from './services/drizzle-business-graph-service.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { DrizzleTaskDispatcher } from './services/task-dispatcher.js';
 import { DrizzleProvisioningService } from './webhooks/provisioning.js';
@@ -330,6 +332,204 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
         userId: orgA.userId,
         teamId: null,
         role: 'team_member',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a Business Graph relationship whose source entity belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const [entityA] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgA.organizationId,
+        entityType: 'client',
+        name: 'Org A Client',
+        confidence: 'AUTHORITATIVE',
+      })
+      .returning();
+    const [entityB] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgB.organizationId,
+        entityType: 'project',
+        name: 'Org B Project',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    await expect(
+      db.insert(schema.businessRelationships).values({
+        organizationId: orgB.organizationId,
+        fromEntityId: entityA!.id,
+        toEntityId: entityB!.id,
+        relationshipType: 'belongs_to',
+        confidence: 'UNVERIFIED',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a Business Graph relationship whose target entity belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const [entityA] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgA.organizationId,
+        entityType: 'client',
+        name: 'Org A Client',
+      })
+      .returning();
+    const [entityB] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgB.organizationId,
+        entityType: 'system',
+        name: 'Org B System',
+      })
+      .returning();
+
+    await expect(
+      db.insert(schema.businessRelationships).values({
+        organizationId: orgA.organizationId,
+        fromEntityId: entityA!.id,
+        toEntityId: entityB!.id,
+        relationshipType: 'uses',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('accepts an in-tenant Business Graph relationship with provenance', async () => {
+    const org = await seedTenant(db);
+    const [client] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: org.organizationId,
+        entityType: 'client',
+        name: 'Acme Client',
+        sourceSystem: 'crm',
+        sourceRef: 'client-123',
+        confidence: 'AUTHORITATIVE',
+      })
+      .returning();
+    const [project] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: org.organizationId,
+        entityType: 'project',
+        name: 'Website',
+        sourceSystem: 'project_manager',
+        sourceRef: 'project-456',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    const [relationship] = await db
+      .insert(schema.businessRelationships)
+      .values({
+        organizationId: org.organizationId,
+        fromEntityId: project!.id,
+        toEntityId: client!.id,
+        relationshipType: 'belongs_to',
+        sourceSystem: 'project_manager',
+        sourceRef: 'project-456',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    expect(relationship!.organizationId).toBe(org.organizationId);
+    expect(relationship!.relationshipType).toBe('belongs_to');
+    expect(relationship!.sourceSystem).toBe('project_manager');
+  });
+
+  it('Business Graph service hides another tenant’s entity and relationships', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const svc = new DrizzleBusinessGraphService(db);
+    const client = await svc.createEntity(orgA.organizationId, {
+      entityType: 'client',
+      name: 'Private Client',
+      sourceSystem: 'crm',
+      sourceRef: 'private-1',
+      confidence: 'AUTHORITATIVE',
+    });
+    const project = await svc.createEntity(orgA.organizationId, {
+      entityType: 'project',
+      name: 'Private Project',
+    });
+    await svc.createRelationship(orgA.organizationId, {
+      fromEntityId: project.id,
+      toEntityId: client.id,
+      relationshipType: 'belongs_to',
+    });
+
+    expect(await svc.getEntity(client.id, orgA.organizationId)).not.toBeNull();
+    expect(await svc.getEntity(client.id, orgB.organizationId)).toBeNull();
+    expect(await svc.listRelationships(orgA.organizationId, client.id)).toHaveLength(1);
+    expect(await svc.listRelationships(orgB.organizationId, client.id)).toHaveLength(0);
+  });
+
+  it('Business Constitution proposals do not become active until a human approves them', async () => {
+    const org = await seedTenant(db);
+    const svc = new DrizzleBusinessConstitutionService(db);
+    const proposal = await svc.propose(org.organizationId, org.userId, [
+      {
+        kind: 'role_authority',
+        key: 'external_send',
+        statement: 'External sends require approval.',
+        action: 'external.send',
+        requiresApproval: true,
+      },
+    ]);
+
+    expect(proposal.constitution.status).toBe('proposed');
+    expect(await svc.getActive(org.organizationId)).toBeNull();
+
+    expect(
+      await svc.approve(org.organizationId, proposal.constitution.id, org.userId, 'agent'),
+    ).toBeNull();
+    expect(await svc.getActive(org.organizationId)).toBeNull();
+
+    const approved = await svc.approve(
+      org.organizationId,
+      proposal.constitution.id,
+      org.userId,
+      'human',
+    );
+    expect(approved!.constitution.status).toBe('approved');
+    expect(approved!.rules[0]!.requiresApproval).toBe(true);
+    expect((await svc.getActive(org.organizationId))!.constitution.id).toBe(
+      proposal.constitution.id,
+    );
+  });
+
+  it('Business Constitution is tenant-isolated at proposal and approval boundaries', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const svc = new DrizzleBusinessConstitutionService(db);
+    const proposal = await svc.propose(orgA.organizationId, orgA.userId, [
+      {
+        kind: 'never_autonomous',
+        key: 'delete_production',
+        statement: 'Never delete production data autonomously.',
+        action: 'production.delete',
+        neverAutonomous: true,
+        requiresApproval: true,
+      },
+    ]);
+
+    expect(await svc.getActive(orgB.organizationId)).toBeNull();
+    expect(
+      await svc.approve(orgB.organizationId, proposal.constitution.id, orgB.userId, 'human'),
+    ).toBeNull();
+
+    await expect(
+      db.insert(schema.constitutionRules).values({
+        organizationId: orgB.organizationId,
+        constitutionId: proposal.constitution.id,
+        kind: 'ai_boundary',
+        key: 'cross_tenant',
+        statement: 'Must fail.',
       }),
     ).rejects.toThrow();
   });
