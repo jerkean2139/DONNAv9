@@ -47,13 +47,8 @@ cross-tenant foreign-key protections for core references.
 
 ## CI baseline
 
-On the Agent Factory planning branch, the live-Postgres integration job has
-successfully completed both the application build and integration tests.
-
-The planning branch initially failed the normal CI job only because the new
-Markdown master plan was not formatted to the repository's Prettier rules.
-That documentation formatting issue is being corrected in this PR before the
-baseline is declared green.
+Normal CI is green on the current architecture branch after Markdown formatting
+was normalized. The live-Postgres integration job is also green.
 
 ## Multi-tenant baseline
 
@@ -86,15 +81,47 @@ governance boundaries rather than bypassing them.
 
 ## Deployment baseline
 
-Repository configuration verifies that Railway is the selected host for the
-long-running control-plane and worker tier and that Railway Postgres is the
-intended authoritative production store.
+Production infrastructure was directly verified on Railway on 2026-09-24:
 
-The actual current Railway dashboard state, applied migration level, database
-backup policy, restore success, environment variables, and live service health
-have **not** been independently verified in this repository audit.
+- control plane deployment is healthy.
+- worker deployment is healthy.
+- authoritative production Postgres is healthy.
+- the erroneous standalone `@donna/core-domain` runtime service was removed; the
+  package remains a source dependency used by runtime applications.
+- Postgres point-in-time recovery (PITR) is enabled.
+- the initial PITR full/base backup completed successfully.
+- continuous WAL archiving is healthy.
+- production remained online during the recovery drill.
 
-Those checks remain required before any production migration.
+### PITR restore drill
+
+A point-in-time restore was requested for **2026-09-23 23:25:36 EDT**. Railway
+created a new sibling Postgres service and left the source production database
+running.
+
+The restored service `Postgres-restored-20260924-0325` reached SUCCESS.
+
+Read-only verification in the restored database confirmed:
+
+- PostgreSQL responds normally.
+- 22 non-system application/worker tables are present.
+- expected DONNA tables include organizations, users, teams, memberships,
+  projects, project_memberships, objectives, tasks, task_dependencies, events,
+  approvals, delegations, audit_events, feature_flags, and idempotency_keys.
+- `drizzle.__drizzle_migrations` is present.
+- `graphile_worker.migrations` is present.
+- the Drizzle migration table contains exactly **6** application migration
+  records, matching the repository baseline of migrations `0000` through
+  `0005`.
+
+This verifies that PITR can recover the DONNA application schema and migration
+state into a separate service without replacing production.
+
+Multiple temporary restored services were created during the mobile restore
+test. They are disposable drill artifacts and may be removed after this evidence
+is recorded.
+
+No production schema migration was performed as part of the restore drill.
 
 ## Documentation drift found
 
@@ -108,15 +135,24 @@ This PR updates the high-level status to match the codebase.
 
 ## Phase 0 exit gates
 
-Phase 0 is complete only when:
+Phase 0 exit gates are now satisfied:
 
 - normal CI is green.
 - live-Postgres integration is green.
 - README/repository docs reflect the implemented baseline.
-- the Agent Factory architecture ADR is accepted.
-- the baseline/rollback commit is recorded.
-- no production migration has been run.
-- production backup/restore status is verified before Phase 1 schema changes.
+- Agent Factory architecture ADRs are accepted.
+- baseline/rollback commit is recorded.
+- production control plane, worker, and Postgres are healthy.
+- PITR is enabled and archiving.
+- a separate-service PITR restore completed successfully.
+- restored schema and the six-record Drizzle migration baseline were verified.
+- no new Phase 1 production migration was run during the safety verification.
+
+**Phase 0 status: COMPLETE.**
+
+Phase 1 schema work may proceed through normal branch/PR/test review. Production
+migration remains a separately controlled deployment action and must continue to
+follow backup, review, and rollback requirements.
 
 ## Rollback point
 
