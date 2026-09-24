@@ -485,7 +485,9 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect(proposal.constitution.status).toBe('proposed');
     expect(await svc.getActive(org.organizationId)).toBeNull();
 
-    expect(await svc.approve(org.organizationId, proposal.constitution.id, org.userId, 'agent')).toBeNull();
+    expect(
+      await svc.approve(org.organizationId, proposal.constitution.id, org.userId, 'agent'),
+    ).toBeNull();
     expect(await svc.getActive(org.organizationId)).toBeNull();
 
     const approved = await svc.approve(
@@ -496,7 +498,9 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     );
     expect(approved!.constitution.status).toBe('approved');
     expect(approved!.rules[0]!.requiresApproval).toBe(true);
-    expect((await svc.getActive(org.organizationId))!.constitution.id).toBe(proposal.constitution.id);
+    expect((await svc.getActive(org.organizationId))!.constitution.id).toBe(
+      proposal.constitution.id,
+    );
   });
 
   it('Business Constitution is tenant-isolated at proposal and approval boundaries', async () => {
