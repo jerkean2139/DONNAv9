@@ -334,6 +334,112 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     ).rejects.toThrow();
   });
 
+  it('rejects a Business Graph relationship whose source entity belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const [entityA] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgA.organizationId,
+        entityType: 'client',
+        name: 'Org A Client',
+        confidence: 'AUTHORITATIVE',
+      })
+      .returning();
+    const [entityB] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgB.organizationId,
+        entityType: 'project',
+        name: 'Org B Project',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    await expect(
+      db.insert(schema.businessRelationships).values({
+        organizationId: orgB.organizationId,
+        fromEntityId: entityA!.id,
+        toEntityId: entityB!.id,
+        relationshipType: 'belongs_to',
+        confidence: 'UNVERIFIED',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a Business Graph relationship whose target entity belongs to another organization', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const [entityA] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgA.organizationId,
+        entityType: 'client',
+        name: 'Org A Client',
+      })
+      .returning();
+    const [entityB] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: orgB.organizationId,
+        entityType: 'system',
+        name: 'Org B System',
+      })
+      .returning();
+
+    await expect(
+      db.insert(schema.businessRelationships).values({
+        organizationId: orgA.organizationId,
+        fromEntityId: entityA!.id,
+        toEntityId: entityB!.id,
+        relationshipType: 'uses',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('accepts an in-tenant Business Graph relationship with provenance', async () => {
+    const org = await seedTenant(db);
+    const [client] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: org.organizationId,
+        entityType: 'client',
+        name: 'Acme Client',
+        sourceSystem: 'crm',
+        sourceRef: 'client-123',
+        confidence: 'AUTHORITATIVE',
+      })
+      .returning();
+    const [project] = await db
+      .insert(schema.businessEntities)
+      .values({
+        organizationId: org.organizationId,
+        entityType: 'project',
+        name: 'Website',
+        sourceSystem: 'project_manager',
+        sourceRef: 'project-456',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    const [relationship] = await db
+      .insert(schema.businessRelationships)
+      .values({
+        organizationId: org.organizationId,
+        fromEntityId: project!.id,
+        toEntityId: client!.id,
+        relationshipType: 'belongs_to',
+        sourceSystem: 'project_manager',
+        sourceRef: 'project-456',
+        confidence: 'PRIMARY',
+      })
+      .returning();
+
+    expect(relationship!.organizationId).toBe(org.organizationId);
+    expect(relationship!.relationshipType).toBe('belongs_to');
+    expect(relationship!.sourceSystem).toBe('project_manager');
+  });
+
   it('still accepts an in-tenant task, dependency, and event (sanity)', async () => {
     const org = await seedTenant(db);
     const objective = await new DrizzleObjectiveService(db).create(
