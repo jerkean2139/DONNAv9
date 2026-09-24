@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
+import { DrizzleBusinessConstitutionService } from './services/drizzle-business-constitution-service.js';
 import { DrizzleBusinessGraphService } from './services/drizzle-business-graph-service.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { DrizzleTaskDispatcher } from './services/task-dispatcher.js';
@@ -466,6 +467,67 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect(await svc.getEntity(client.id, orgB.organizationId)).toBeNull();
     expect(await svc.listRelationships(orgA.organizationId, client.id)).toHaveLength(1);
     expect(await svc.listRelationships(orgB.organizationId, client.id)).toHaveLength(0);
+  });
+
+  it('Business Constitution proposals do not become active until a human approves them', async () => {
+    const org = await seedTenant(db);
+    const svc = new DrizzleBusinessConstitutionService(db);
+    const proposal = await svc.propose(org.organizationId, org.userId, [
+      {
+        kind: 'role_authority',
+        key: 'external_send',
+        statement: 'External sends require approval.',
+        action: 'external.send',
+        requiresApproval: true,
+      },
+    ]);
+
+    expect(proposal.constitution.status).toBe('proposed');
+    expect(await svc.getActive(org.organizationId)).toBeNull();
+
+    expect(await svc.approve(org.organizationId, proposal.constitution.id, org.userId, 'agent')).toBeNull();
+    expect(await svc.getActive(org.organizationId)).toBeNull();
+
+    const approved = await svc.approve(
+      org.organizationId,
+      proposal.constitution.id,
+      org.userId,
+      'human',
+    );
+    expect(approved!.constitution.status).toBe('approved');
+    expect(approved!.rules[0]!.requiresApproval).toBe(true);
+    expect((await svc.getActive(org.organizationId))!.constitution.id).toBe(proposal.constitution.id);
+  });
+
+  it('Business Constitution is tenant-isolated at proposal and approval boundaries', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const svc = new DrizzleBusinessConstitutionService(db);
+    const proposal = await svc.propose(orgA.organizationId, orgA.userId, [
+      {
+        kind: 'never_autonomous',
+        key: 'delete_production',
+        statement: 'Never delete production data autonomously.',
+        action: 'production.delete',
+        neverAutonomous: true,
+        requiresApproval: true,
+      },
+    ]);
+
+    expect(await svc.getActive(orgB.organizationId)).toBeNull();
+    expect(
+      await svc.approve(orgB.organizationId, proposal.constitution.id, orgB.userId, 'human'),
+    ).toBeNull();
+
+    await expect(
+      db.insert(schema.constitutionRules).values({
+        organizationId: orgB.organizationId,
+        constitutionId: proposal.constitution.id,
+        kind: 'ai_boundary',
+        key: 'cross_tenant',
+        statement: 'Must fail.',
+      }),
+    ).rejects.toThrow();
   });
 
   it('still accepts an in-tenant task, dependency, and event (sanity)', async () => {
