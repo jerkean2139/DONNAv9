@@ -43,22 +43,35 @@ export class DrizzleBusinessConstitutionService {
         .values({ organizationId, version, title, proposedByUserId, status: 'proposed' })
         .returning();
 
-      const insertedRules = rules.length === 0 ? [] : await tx
-        .insert(schema.constitutionRules)
-        .values(rules.map((rule) => ({
-          organizationId,
-          constitutionId: constitution!.id,
-          kind: rule.kind,
-          key: rule.key,
-          statement: rule.statement,
-          ...(rule.action !== undefined ? { action: rule.action } : {}),
-          ...(rule.thresholdMinor !== undefined ? { thresholdMinor: rule.thresholdMinor } : {}),
-          ...(rule.currency !== undefined ? { currency: rule.currency } : {}),
-          ...(rule.requiresApproval !== undefined ? { requiresApproval: rule.requiresApproval } : {}),
-          ...(rule.neverAutonomous !== undefined ? { neverAutonomous: rule.neverAutonomous } : {}),
-          ...(rule.structuredValue !== undefined ? { structuredValue: rule.structuredValue } : {}),
-        })))
-        .returning();
+      const insertedRules =
+        rules.length === 0
+          ? []
+          : await tx
+              .insert(schema.constitutionRules)
+              .values(
+                rules.map((rule) => ({
+                  organizationId,
+                  constitutionId: constitution!.id,
+                  kind: rule.kind,
+                  key: rule.key,
+                  statement: rule.statement,
+                  ...(rule.action !== undefined ? { action: rule.action } : {}),
+                  ...(rule.thresholdMinor !== undefined
+                    ? { thresholdMinor: rule.thresholdMinor }
+                    : {}),
+                  ...(rule.currency !== undefined ? { currency: rule.currency } : {}),
+                  ...(rule.requiresApproval !== undefined
+                    ? { requiresApproval: rule.requiresApproval }
+                    : {}),
+                  ...(rule.neverAutonomous !== undefined
+                    ? { neverAutonomous: rule.neverAutonomous }
+                    : {}),
+                  ...(rule.structuredValue !== undefined
+                    ? { structuredValue: rule.structuredValue }
+                    : {}),
+                })),
+              )
+              .returning();
 
       return { constitution: constitution!, rules: insertedRules };
     });
@@ -76,53 +89,78 @@ export class DrizzleBusinessConstitutionService {
       const [candidate] = await tx
         .select()
         .from(schema.businessConstitutions)
-        .where(and(
-          eq(schema.businessConstitutions.organizationId, organizationId),
-          eq(schema.businessConstitutions.id, constitutionId),
-          eq(schema.businessConstitutions.status, 'proposed'),
-        ))
+        .where(
+          and(
+            eq(schema.businessConstitutions.organizationId, organizationId),
+            eq(schema.businessConstitutions.id, constitutionId),
+            eq(schema.businessConstitutions.status, 'proposed'),
+          ),
+        )
         .limit(1);
       if (candidate === undefined) return null;
 
-      await tx.update(schema.businessConstitutions)
+      await tx
+        .update(schema.businessConstitutions)
         .set({ status: 'superseded', updatedAt: new Date() })
-        .where(and(
-          eq(schema.businessConstitutions.organizationId, organizationId),
-          eq(schema.businessConstitutions.status, 'approved'),
-        ));
+        .where(
+          and(
+            eq(schema.businessConstitutions.organizationId, organizationId),
+            eq(schema.businessConstitutions.status, 'approved'),
+          ),
+        );
 
-      const [approved] = await tx.update(schema.businessConstitutions)
-        .set({ status: 'approved', approvedByUserId, approvedAt: new Date(), updatedAt: new Date() })
-        .where(and(
-          eq(schema.businessConstitutions.organizationId, organizationId),
-          eq(schema.businessConstitutions.id, constitutionId),
-        ))
+      const [approved] = await tx
+        .update(schema.businessConstitutions)
+        .set({
+          status: 'approved',
+          approvedByUserId,
+          approvedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.businessConstitutions.organizationId, organizationId),
+            eq(schema.businessConstitutions.id, constitutionId),
+          ),
+        )
         .returning();
 
-      const activeRules = await tx.select().from(schema.constitutionRules)
-        .where(and(
-          eq(schema.constitutionRules.organizationId, organizationId),
-          eq(schema.constitutionRules.constitutionId, constitutionId),
-        ));
+      const activeRules = await tx
+        .select()
+        .from(schema.constitutionRules)
+        .where(
+          and(
+            eq(schema.constitutionRules.organizationId, organizationId),
+            eq(schema.constitutionRules.constitutionId, constitutionId),
+          ),
+        );
       return { constitution: approved!, rules: activeRules };
     });
   }
 
   async getActive(organizationId: string): Promise<ConstitutionProposal | null> {
-    const [constitution] = await this.db.select().from(schema.businessConstitutions)
-      .where(and(
-        eq(schema.businessConstitutions.organizationId, organizationId),
-        eq(schema.businessConstitutions.status, 'approved'),
-      ))
+    const [constitution] = await this.db
+      .select()
+      .from(schema.businessConstitutions)
+      .where(
+        and(
+          eq(schema.businessConstitutions.organizationId, organizationId),
+          eq(schema.businessConstitutions.status, 'approved'),
+        ),
+      )
       .orderBy(desc(schema.businessConstitutions.version))
       .limit(1);
     if (constitution === undefined) return null;
 
-    const activeRules = await this.db.select().from(schema.constitutionRules)
-      .where(and(
-        eq(schema.constitutionRules.organizationId, organizationId),
-        eq(schema.constitutionRules.constitutionId, constitution.id),
-      ));
+    const activeRules = await this.db
+      .select()
+      .from(schema.constitutionRules)
+      .where(
+        and(
+          eq(schema.constitutionRules.organizationId, organizationId),
+          eq(schema.constitutionRules.constitutionId, constitution.id),
+        ),
+      );
     return { constitution, rules: activeRules };
   }
 }
