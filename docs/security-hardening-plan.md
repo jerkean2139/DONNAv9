@@ -178,22 +178,47 @@ constraints (0005); migrator already runs on boot (PR #20).
 
 ---
 
-### SEC-4 — Persist authoritative task transitions
+### SEC-4 — Persist authoritative task transitions — done
 
-**Problem:** worker never updates `tasks.status`.
+**Problem:** the worker ran orders and the orchestrator emitted the execution
+trace, but nothing ever updated `tasks.status` — the durable row stayed
+`pending` forever, so recovery, reclamation and UI could not tell what happened.
 
-**Design:** a task-state repository the worker uses; enforce the existing task
-state machine; persist status, execution class, retry count, checkpoint, error
-class, completion metadata; **update task row and write the outbox event in one
-transaction**; distinguish transient (Graphile retries) from terminal failures;
-reject illegal/duplicate transitions.
+**Design (as built):** a `TaskStateStore` the worker owns. The worker hands the
+orchestrator a per-job `BufferingEventBus` (the trace is collected in memory,
+not written mid-run), then `commitOutcome` does everything in ONE transaction:
+lock the task row, write the buffered trace events, walk the domain state
+machine to the outcome status, and update the row — so the row and its events
+can never disagree once committed. Redelivery-safe: a task already terminal is
+skipped (no illegal transition, no duplicate events); a row that is not
+`pending` is skipped rather than risking a poison job. A retryable failure with
+budget left increments `retryCount`, emits `task.retried`, and re-enqueues the
+same order (keyed by task id, so it replaces rather than duplicates). A thrown
+error in `commitOutcome` is transient — the worker rethrows so graphile-worker
+retries the whole job; a business outcome never rethrows.
 
-**Acceptance:** success→completed; policy denial→blocked; approval→awaiting-
-approval; retryable→retry incremented + still retryable; terminal→failed; task
-row and emitted event never disagree post-commit; integration tests on PG.
+Outcome → task status: completed→completed; approval_required→awaiting_approval;
+denied/blocked/budget_exceeded/awaiting_human→blocked; failed→failed (or
+→pending + retryCount++ when retries remain).
 
-**Deps:** SEC-3 merged. **Migration:** possibly extra task columns (retry count,
-error class, checkpoint) if not present; document.
+**Acceptance:** success→completed ✅; policy denial→blocked ✅;
+approval→awaiting_approval ✅; retryable→retry incremented + still retryable ✅;
+terminal→failed ✅; row and events committed together (never disagree) ✅;
+integration tests on live PG ✅ (7 cases: each mapping, retry re-enqueue,
+exhausted-retry terminal, redelivery no-op, not_found).
+
+**No migration:** the `tasks` table already carries status, retry_count,
+checkpoint, lease/heartbeat columns. The failure `reason` lives on the emitted
+event (the audit trail), not a new column.
+
+**Deferred (by design):** side-effect idempotency on redelivery (a completed
+task that is redelivered re-runs `executeWorkOrder` before `commitOutcome` skips
+the row) is SEC-6's idempotency-key work, not SEC-4. SEC-4 guarantees row/status
+idempotency only. The `running` window is not separately persisted (buffering
+commits `pending`→terminal atomically); live lease/heartbeat reclamation is a
+later concern.
+
+**Deps:** SEC-3 merged.
 
 ---
 
