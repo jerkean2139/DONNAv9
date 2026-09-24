@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { createDatabase, runDrizzleMigrations, type DonnaDatabase } from '@donna/db';
 import { InMemoryEventBus } from '@donna/events';
 import { runMigrations } from 'graphile-worker';
@@ -108,6 +111,16 @@ if (config.databaseUrl !== undefined) {
     taskDispatcher,
     authenticate: buildAuthenticator(config.auth, undefined),
   };
+}
+
+// Serve the built web app from the same service when it is present (the root
+// build produces `apps/web/dist`), so the deployment URL shows the UI.
+const webRoot =
+  process.env['WEB_DIST_DIR'] ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
+if (existsSync(webRoot)) {
+  deps = { ...deps, webRoot };
+} else {
+  console.warn(`Web bundle not found at ${webRoot} — serving the API only.`);
 }
 
 const app = buildServer(deps);

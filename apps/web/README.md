@@ -27,6 +27,12 @@ local state. `apps/web` stays behind the API boundary — it never imports
 Auth: dev-only `x-donna-*` principal headers via the client — replaced by real
 session auth in a later phase.
 
+## Deployment
+
+The root `pnpm run build` produces `apps/web/dist`, and the control-plane
+serves it at `/` (API routes take precedence; set `WEB_DIST_DIR` to override the
+path). So the Railway control-plane URL shows this UI — no separate service.
+
 ## Commands
 
 ```bash

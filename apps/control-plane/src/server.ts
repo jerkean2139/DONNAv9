@@ -1,6 +1,7 @@
 import type { ObjectiveId, ProjectId, RiskLevel, Scope } from '@donna/core-domain';
 import type { WorkOrder } from '@donna/orchestrator';
 import { evaluate, type ResourceDescriptor } from '@donna/policy';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { OBJECTIVE_CREATE_ACTION, OBJECTIVE_READ_ACTION, TASK_DISPATCH_ACTION } from './actions.js';
@@ -30,6 +31,12 @@ export interface ServerDeps {
     readonly verifier: WebhookVerifier;
     readonly provisioning: ProvisioningService;
   };
+  /**
+   * Absolute path to the built web app (`apps/web/dist`). When present, the
+   * static bundle is served at `/` and unknown GET routes fall back to
+   * `index.html`, so a single deployment shows the UI. API routes win.
+   */
+  readonly webRoot?: string;
 }
 
 function svixHeaders(headers: Record<string, unknown>): Record<string, string> {
@@ -273,6 +280,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         }
         throw error;
       }
+    });
+  }
+
+  if (deps.webRoot !== undefined) {
+    const webRoot = deps.webRoot;
+    void app.register(fastifyStatic, { root: webRoot, wildcard: false });
+    app.setNotFoundHandler((request, reply) => {
+      if (request.method === 'GET' && (request.headers.accept ?? '').includes('text/html')) {
+        return reply.sendFile('index.html', webRoot);
+      }
+      return reply.code(404).send({ error: 'not_found' });
     });
   }
 
