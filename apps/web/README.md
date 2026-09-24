@@ -16,16 +16,18 @@ project manager (Build Bible V2-001).
 - **Bottom** — the persistent command bar: express an outcome; Donna turns it
   into an objective.
 
-## Data is mocked for now
+## Live data
 
-The shell renders from `src/data/mock.ts`. `src/api/client.ts` is the typed
-control-plane client (health, create objective) used once the API is wired;
-the UI then becomes a projection of the live event/task model (§4.2) instead of
-local state. `apps/web` stays behind the API boundary — it never imports
-`@donna/db` or `@donna/policy` (enforced in CI).
+Objectives (list + create from the command bar) and control-plane health are
+live. The remaining panels (active work, approvals, alerts, nodes) still render
+from `src/data/mock.ts` and are labeled "(sample)" until their APIs exist.
+`apps/web` stays behind the API boundary — it never imports `@donna/db` or
+`@donna/policy` (enforced in CI).
 
-Auth: dev-only `x-donna-*` principal headers via the client — replaced by real
-session auth in a later phase.
+Auth comes from `GET /client-config`: with `CLERK_PUBLISHABLE_KEY` set the app
+signs in with Clerk and sends its JWT; under `APP_ENV=development` it uses the
+dev workspace identity the control-plane bootstraps. Clerk is lazy-loaded, so
+the dev path never downloads it.
 
 ## Deployment
 

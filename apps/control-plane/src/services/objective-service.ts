@@ -31,6 +31,11 @@ export interface ObjectiveService {
    * schema up).
    */
   get(id: string, organizationId: string): Promise<Objective | null>;
+  /**
+   * The organization's most recent objectives, newest first. Tenant-scoped like
+   * `get`; the caller still applies the per-objective scope policy.
+   */
+  list(organizationId: string, limit: number): Promise<Objective[]>;
 }
 
 /**
@@ -82,5 +87,14 @@ export class InMemoryObjectiveService implements ObjectiveService {
     const entry = this.store.get(id);
     if (entry === undefined || entry.organizationId !== organizationId) return null;
     return entry.objective;
+  }
+
+  async list(organizationId: string, limit: number): Promise<Objective[]> {
+    // Map preserves insertion order, so reverse it for newest first.
+    return [...this.store.values()]
+      .filter((entry) => entry.organizationId === organizationId)
+      .map((entry) => entry.objective)
+      .reverse()
+      .slice(0, limit);
   }
 }

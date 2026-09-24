@@ -4,7 +4,7 @@ import type { Objective, ObjectiveId, OrganizationId, UserId } from '@donna/core
 import { eventEnvelopeToRow, schema, type DonnaDatabase } from '@donna/db';
 import { createEvent } from '@donna/events';
 import type { PrincipalContext } from '@donna/policy';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 import { objectiveToRow, rowToObjective } from '../db/mappers.js';
 import type { CreateObjectiveInput, ObjectiveService } from './objective-service.js';
@@ -64,5 +64,15 @@ export class DrizzleObjectiveService implements ObjectiveService {
       .limit(1);
     const row = rows[0];
     return row === undefined ? null : rowToObjective(row);
+  }
+
+  async list(organizationId: string, limit: number): Promise<Objective[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.objectives)
+      .where(eq(schema.objectives.organizationId, organizationId))
+      .orderBy(desc(schema.objectives.createdAt))
+      .limit(limit);
+    return rows.map(rowToObjective);
   }
 }

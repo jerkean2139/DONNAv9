@@ -30,9 +30,12 @@ describe('ControlPlaneClient', () => {
       principalHeaders: { 'x-donna-user-id': 'u1' },
     });
 
-    const obj = await client.createObjective({ requestedOutcome: 'x', definitionOfDone: 'y' });
+    const result = await client.createObjective({ requestedOutcome: 'x', definitionOfDone: 'y' });
 
-    expect(obj.id).toBe('o1');
+    expect(result).toEqual({
+      status: 'created',
+      objective: { id: 'o1', requestedOutcome: 'x', status: 'draft' },
+    });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as FetchCall;
     expect(url).toBe('http://api.test/objectives');
     expect(init?.method).toBe('POST');
@@ -49,5 +52,57 @@ describe('ControlPlaneClient', () => {
     await expect(
       client.createObjective({ requestedOutcome: 'x', definitionOfDone: 'y' }),
     ).rejects.toThrow('forbidden');
+  });
+
+  it('reports a policy approval gate (202) instead of a created objective', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ status: 'approval_required', reason: 'high_risk' }),
+    });
+    const client = new ControlPlaneClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    const result = await client.createObjective({ requestedOutcome: 'x', definitionOfDone: 'y' });
+
+    expect(result).toEqual({ status: 'approval_required', reason: 'high_risk' });
+  });
+
+  it('signs requests with per-request auth headers', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ objectives: [] }),
+    });
+    const client = new ControlPlaneClient({
+      baseUrl: '',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      authHeaders: async () => ({ authorization: 'Bearer t0k' }),
+    });
+
+    await client.listObjectives();
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as FetchCall;
+    expect(url).toBe('/objectives');
+    expect((init?.headers as Record<string, string>)['authorization']).toBe('Bearer t0k');
+  });
+
+  it('surfaces the API error code', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'missing_bearer_token' }),
+    });
+    const client = new ControlPlaneClient({
+      baseUrl: '',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await expect(client.listObjectives()).rejects.toMatchObject({
+      status: 401,
+      code: 'missing_bearer_token',
+    });
   });
 });

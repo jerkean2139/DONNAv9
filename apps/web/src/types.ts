@@ -25,7 +25,7 @@ export interface ApprovalView {
 }
 
 export interface HealthView {
-  controlPlane: 'ok' | 'degraded' | 'down';
+  controlPlane: 'ok' | 'checking' | 'degraded' | 'down';
   activeJobs: number;
   nodes: {
     name: string;

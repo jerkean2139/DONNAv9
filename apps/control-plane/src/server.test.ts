@@ -374,3 +374,66 @@ describe('control-plane API', () => {
     expect(ctx.workQueue.enqueued).toHaveLength(0);
   });
 });
+
+describe('GET /objectives', () => {
+  it('requires authentication', async () => {
+    const { app } = makeApp();
+    const res = await app.inject({ method: 'GET', url: '/objectives' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('lists the caller org objectives newest first', async () => {
+    const { app } = makeApp();
+    const first = await createObjective(app);
+    const second = await createScoped(app, 'ORGANIZATION');
+    const res = await app.inject({ method: 'GET', url: '/objectives', headers: memberHeaders });
+    expect(res.statusCode).toBe(200);
+    const ids = (res.json().objectives as { id: string }[]).map((o) => o.id);
+    expect(ids).toEqual([second, first]);
+  });
+
+  it('never lists another organization objectives', async () => {
+    const { app } = makeApp();
+    await createObjective(app);
+    const res = await app.inject({ method: 'GET', url: '/objectives', headers: otherOrgHeaders });
+    expect(res.json().objectives).toEqual([]);
+  });
+
+  it('omits objectives the caller may not read (PRIVATE of another user)', async () => {
+    const { app } = makeApp();
+    const priv = await createScoped(app, 'PRIVATE');
+    const shared = await createScoped(app, 'ORGANIZATION');
+    const res = await app.inject({
+      method: 'GET',
+      url: '/objectives',
+      headers: sameOrgOtherUserHeaders,
+    });
+    const ids = (res.json().objectives as { id: string }[]).map((o) => o.id);
+    expect(ids).toContain(shared);
+    expect(ids).not.toContain(priv);
+  });
+});
+
+describe('GET /client-config', () => {
+  it('reports unconfigured auth by default', async () => {
+    const { app } = makeApp();
+    const res = await app.inject({ method: 'GET', url: '/client-config' });
+    expect(res.json()).toEqual({ auth: 'unconfigured' });
+  });
+
+  it('serves the configured public auth settings without authentication', async () => {
+    const bus = new InMemoryEventBus();
+    const app = buildServer({
+      objectiveService: new InMemoryObjectiveService(bus),
+      taskDispatcher: new InMemoryTaskDispatcher(
+        new InMemoryTaskService(bus),
+        new InMemoryWorkQueue(),
+      ),
+      authenticate: devAuthenticator(),
+      clientConfig: { auth: 'clerk', clerkPublishableKey: 'pk_test_123' },
+    });
+    const res = await app.inject({ method: 'GET', url: '/client-config' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ auth: 'clerk', clerkPublishableKey: 'pk_test_123' });
+  });
+});

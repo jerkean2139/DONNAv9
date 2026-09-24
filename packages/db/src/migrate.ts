@@ -29,7 +29,13 @@ export const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)),
  * boot; this function owns only the application schema.
  */
 export async function runDrizzleMigrations(connectionString: string): Promise<void> {
-  const sql = postgres(connectionString, { max: 1, prepare: false });
+  const sql = postgres(connectionString, {
+    max: 1,
+    prepare: false,
+    // Postgres NOTICEs ("already exists, skipping") are expected on every
+    // re-run; don't dump them into the deploy log.
+    onnotice: () => {},
+  });
   try {
     await migrate(drizzle(sql, { schema }), { migrationsFolder });
   } finally {
