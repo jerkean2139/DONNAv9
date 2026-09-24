@@ -84,11 +84,18 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # The skip-guarded integration harness runs only when TEST_DATABASE_URL is
-      # set — it applies the Drizzle + graphile schemas itself and asserts the
-      # transactional-outbox, provisioning and tenant-scoped invariants against a
-      # real database.
-      - name: Integration tests
+      # The skip-guarded integration harnesses run only when TEST_DATABASE_URL is
+      # set — they apply the Drizzle + graphile schemas themselves and assert the
+      # transactional-outbox, provisioning, tenant-scoped and task-state
+      # invariants against a real database. The two runs share one database and
+      # run sequentially; migrations are idempotent and every fixture row uses a
+      # fresh UUID, so their data never collides.
+      - name: Integration tests (control-plane)
         env:
           TEST_DATABASE_URL: postgres://donna:donna@localhost:5432/donna
         run: pnpm --filter @donna/control-plane test
+
+      - name: Integration tests (worker)
+        env:
+          TEST_DATABASE_URL: postgres://donna:donna@localhost:5432/donna
+        run: pnpm --filter @donna/worker test

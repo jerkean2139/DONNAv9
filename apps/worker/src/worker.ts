@@ -14,6 +14,7 @@ import { run, type Runner } from 'graphile-worker';
 import { createModelAdapterResolver } from './model-adapters.js';
 import { DrizzleOutboxBus } from './outbox-bus.js';
 import { DrizzleOutboxStore } from './outbox-store.js';
+import { BufferingEventBus, TaskStateStore } from './task-state.js';
 import { parseWorkOrder } from './work-order-payload.js';
 
 export interface WorkerConfig {
@@ -64,6 +65,10 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
   const deliveredBus = config.bus ?? new InMemoryEventBus();
   const dispatcher = new OutboxDispatcher(new DrizzleOutboxStore(db), deliveredBus);
   const batchSize = config.outboxBatchSize ?? 500;
+  // Persists the authoritative task-row transition after each run (SEC-4).
+  const taskState = new TaskStateStore(db);
+  // Fallback outbox for ad-hoc orders that carry no durable task row.
+  const outboxBus = new DrizzleOutboxBus(db);
 
   // Orchestrator dependencies (the composition root). The orchestrator stays
   // provider-agnostic: vendors are bound only in the resolvers, and its events
@@ -93,13 +98,41 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
       },
       [EXECUTE_WORK_ORDER_TASK]: async (payload) => {
         const order = parseWorkOrder(payload);
-        const result = await executeWorkOrder(order, deps);
-        // Terminal status is captured durably in the emitted events; log a line
-        // for operational visibility. A failed order is not a job failure —
-        // graphile-worker only retries on a thrown error — so we do not rethrow.
+        // Buffer the orchestrator's execution trace so it can be committed
+        // atomically with the authoritative task-row transition (SEC-4).
+        const buffer = new BufferingEventBus();
+        const result = await executeWorkOrder(order, { ...deps, bus: buffer });
+
+        // An ad-hoc order with no durable task row: there is nothing to
+        // transition, so just persist the trace to the outbox.
+        if (order.taskId === undefined) {
+          for (const event of buffer.drain()) await outboxBus.publish(event);
+          console.info(
+            `[execute-work-order] org=${order.organizationId} task=- status=${result.status}` +
+              (result.reason !== undefined ? ` reason=${result.reason}` : ''),
+          );
+          return;
+        }
+
+        // Commit the task-row transition + trace in one transaction. A thrown
+        // error here is transient (DB) — rethrow so graphile-worker retries the
+        // whole job; the row is still `pending`, so the retry re-executes. A
+        // business outcome (result.status) is NOT a job failure and never
+        // rethrows.
+        const outcome = await taskState.commitOutcome({
+          taskId: order.taskId,
+          organizationId: order.organizationId,
+          result,
+          events: buffer.drain(),
+          order,
+        });
         console.info(
-          `[execute-work-order] org=${order.organizationId} task=${order.taskId ?? '-'} status=${result.status}` +
-            (result.reason !== undefined ? ` reason=${result.reason}` : ''),
+          `[execute-work-order] org=${order.organizationId} task=${order.taskId} status=${result.status}` +
+            (result.reason !== undefined ? ` reason=${result.reason}` : '') +
+            ` applied=${outcome.applied}` +
+            (outcome.applied
+              ? ` task_status=${outcome.status} retried=${outcome.retried}`
+              : ` reason=${outcome.reason}`),
         );
       },
     },
