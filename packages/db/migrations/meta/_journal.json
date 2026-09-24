@@ -50,6 +50,13 @@
       "when": 1790224800000,
       "tag": "0006_business_graph",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790227200000,
+      "tag": "0007_business_constitution",
+      "breakpoints": true
     }
   ]
 }
