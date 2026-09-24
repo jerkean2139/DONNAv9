@@ -66,8 +66,9 @@ describe('web bundle serving', () => {
     expect(res.json()).toEqual({ status: 'ok' });
   });
 
-  it('serves nothing at / without a web root', async () => {
+  it('explains a missing bundle at / instead of a bare 404', async () => {
     const res = await makeApp().inject({ method: 'GET', url: '/' });
-    expect(res.statusCode).toBe(404);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('bundle was not found');
   });
 });

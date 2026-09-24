@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ApprovalView, ObjectiveView, WorkItemView } from '../types';
 
 interface Props {
-  objective: ObjectiveView;
+  objective: ObjectiveView | null;
   work: WorkItemView[];
   approvals: ApprovalView[];
   alerts: string[];
@@ -23,11 +23,17 @@ export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Pr
   const blockers = work.filter((w) => w.state === 'blocked');
   return (
     <aside className="overflow-auto border-l border-edge bg-panel" aria-label="Donna rail">
-      <Group title="Objective">{objective.requestedOutcome}</Group>
-      <Group title="Active work">
+      <Group title="Objective">
+        {objective === null ? (
+          <span className="text-muted">None yet</span>
+        ) : (
+          objective.requestedOutcome
+        )}
+      </Group>
+      <Group title="Active work (sample)">
         {work.length} item{work.length === 1 ? '' : 's'} in progress
       </Group>
-      <Group title="Blockers">
+      <Group title="Blockers (sample)">
         {blockers.length === 0 ? (
           <span className="text-muted">None</span>
         ) : (
@@ -38,7 +44,7 @@ export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Pr
           </ul>
         )}
       </Group>
-      <Group title="Approvals">
+      <Group title="Approvals (sample)">
         {approvals.length === 0 ? (
           <span className="text-muted">None pending</span>
         ) : (
@@ -52,7 +58,7 @@ export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Pr
           </ul>
         )}
       </Group>
-      <Group title="Alerts">
+      <Group title="Alerts (sample)">
         {alerts.length === 0 ? (
           <span className="text-muted">None</span>
         ) : (
@@ -63,7 +69,7 @@ export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Pr
           </ul>
         )}
       </Group>
-      <Group title="Next recommended action">{nextAction}</Group>
+      <Group title="Next recommended action (sample)">{nextAction}</Group>
     </aside>
   );
 }

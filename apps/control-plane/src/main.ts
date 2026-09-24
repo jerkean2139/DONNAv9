@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createDatabase, runDrizzleMigrations, type DonnaDatabase } from '@donna/db';
@@ -9,8 +10,13 @@ import { createRemoteJWKSet } from 'jose';
 import { devAuthenticator, jwtAuthenticator, type Authenticator } from './auth/authenticate.js';
 import { DrizzlePrincipalResolver } from './auth/principal-resolver.js';
 import { verifyToken, type VerifierConfig } from './auth/token-verifier.js';
+import {
+  ensureDevWorkspace,
+  inMemoryDevPrincipal,
+  type DevPrincipal,
+} from './dev/dev-workspace.js';
 import { resolveStartupConfig, type StartupConfig } from './runtime-config.js';
-import { buildServer, type ServerDeps } from './server.js';
+import { buildServer, type ClientConfig, type ServerDeps } from './server.js';
 import { DrizzleObjectiveService } from './services/drizzle-objective-service.js';
 import { InMemoryObjectiveService } from './services/objective-service.js';
 import {
@@ -74,6 +80,8 @@ if (!resolution.ok) {
 const config = resolution.config;
 
 let deps: ServerDeps;
+// The dev-shim identity the web app uses (outside production only).
+let devPrincipal: DevPrincipal | undefined;
 if (config.databaseUrl !== undefined) {
   // Apply the schema on boot so a deploy with DATABASE_URL set fully prepares
   // the database with no terminal step (§16): the application schema (Drizzle)
@@ -82,6 +90,7 @@ if (config.databaseUrl !== undefined) {
   await runDrizzleMigrations(config.databaseUrl);
   await runMigrations({ connectionString: config.databaseUrl });
   const db = createDatabase(config.databaseUrl);
+  if (config.auth.kind === 'dev-shim') devPrincipal = await ensureDevWorkspace(db);
   deps = {
     objectiveService: new DrizzleObjectiveService(db),
     taskDispatcher: new DrizzleTaskDispatcher(db),
@@ -100,6 +109,7 @@ if (config.databaseUrl !== undefined) {
 } else {
   // Only reachable outside production — production guarantees a database.
   console.warn('DATABASE_URL not set — using in-memory services (state is not durable).');
+  if (config.auth.kind === 'dev-shim') devPrincipal = inMemoryDevPrincipal();
   const bus = new InMemoryEventBus();
   const taskService = new InMemoryTaskService(bus);
   const taskDispatcher: TaskDispatcher = new InMemoryTaskDispatcher(
@@ -113,14 +123,46 @@ if (config.databaseUrl !== undefined) {
   };
 }
 
+// What the web app needs to sign requests. Public values only.
+const clerkPublishableKey = process.env['CLERK_PUBLISHABLE_KEY'];
+const clerkJwtTemplate = process.env['CLERK_JWT_TEMPLATE'];
+const clientConfig: ClientConfig =
+  config.auth.kind === 'jwt'
+    ? clerkPublishableKey !== undefined && clerkPublishableKey !== ''
+      ? {
+          auth: 'clerk',
+          clerkPublishableKey,
+          ...(clerkJwtTemplate !== undefined && clerkJwtTemplate !== ''
+            ? { clerkJwtTemplate }
+            : {}),
+        }
+      : { auth: 'unconfigured' }
+    : devPrincipal !== undefined
+      ? { auth: 'dev', devPrincipal }
+      : { auth: 'unconfigured' };
+if (clientConfig.auth === 'unconfigured') {
+  console.warn('CLERK_PUBLISHABLE_KEY not set — the web app cannot sign users in.');
+}
+deps = { ...deps, clientConfig };
+
 // Serve the built web app from the same service when it is present (the root
-// build produces `apps/web/dist`), so the deployment URL shows the UI.
-const webRoot =
-  process.env['WEB_DIST_DIR'] ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
-if (existsSync(webRoot)) {
+// build produces `apps/web/dist`), so the deployment URL shows the UI. Look
+// relative to this file first, then to the working directory (repo root or the
+// control-plane package, depending on how the start command is run).
+const webCandidates = [
+  process.env['WEB_DIST_DIR'],
+  fileURLToPath(new URL('../../web/dist', import.meta.url)),
+  resolve(process.cwd(), 'apps/web/dist'),
+  resolve(process.cwd(), '../web/dist'),
+].filter((p): p is string => p !== undefined && p !== '');
+const webRoot = webCandidates.find((p) => existsSync(resolve(p, 'index.html')));
+if (webRoot !== undefined) {
+  console.log(`Serving the web app from ${webRoot}`);
   deps = { ...deps, webRoot };
 } else {
-  console.warn(`Web bundle not found at ${webRoot} — serving the API only.`);
+  console.warn(
+    `Web bundle not found (looked in: ${webCandidates.join(', ')}) — serving the API only.`,
+  );
 }
 
 const app = buildServer(deps);

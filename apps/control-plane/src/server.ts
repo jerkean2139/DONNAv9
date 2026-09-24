@@ -1,6 +1,6 @@
-import type { ObjectiveId, ProjectId, RiskLevel, Scope } from '@donna/core-domain';
+import type { Objective, ObjectiveId, ProjectId, RiskLevel, Scope } from '@donna/core-domain';
 import type { WorkOrder } from '@donna/orchestrator';
-import { evaluate, type ResourceDescriptor } from '@donna/policy';
+import { evaluate, type PrincipalContext, type ResourceDescriptor } from '@donna/policy';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 
@@ -37,7 +37,38 @@ export interface ServerDeps {
    * `index.html`, so a single deployment shows the UI. API routes win.
    */
   readonly webRoot?: string;
+  /**
+   * What the web app needs to authenticate, served unauthenticated at
+   * `GET /client-config`. Holds only public values (a Clerk publishable key, or
+   * the dev-shim identity outside production) — never a secret.
+   */
+  readonly clientConfig?: ClientConfig;
 }
+
+export type ClientConfig =
+  | {
+      readonly auth: 'clerk';
+      readonly clerkPublishableKey: string;
+      readonly clerkJwtTemplate?: string;
+    }
+  | {
+      readonly auth: 'dev';
+      readonly devPrincipal: { userId: string; organizationId: string; role: string };
+    }
+  | { readonly auth: 'unconfigured' };
+
+/** The policy resource for reading an existing objective (SEC-2 scope rules). */
+function objectiveResource(objective: Objective, principal: PrincipalContext): ResourceDescriptor {
+  return {
+    organizationId: principal.organizationId,
+    scope: objective.scope,
+    ownerUserId: objective.ownerId,
+    ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
+    ...(objective.teamId !== undefined ? { teamId: objective.teamId } : {}),
+  };
+}
+
+const OBJECTIVE_LIST_LIMIT = 50;
 
 function svixHeaders(headers: Record<string, unknown>): Record<string, string> {
   const pick = (key: string): string => {
@@ -110,6 +141,32 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.get('/health', async () => ({ status: 'ok' }));
 
+  app.get('/client-config', async () => deps.clientConfig ?? { auth: 'unconfigured' });
+
+  // The caller's recent objectives. Tenant-scoped in the query, then filtered by
+  // the same read policy as `GET /objectives/:id`, so an objective the caller
+  // cannot read is simply absent from the list.
+  app.get('/objectives', async (request, reply) => {
+    const auth = await deps.authenticate(request.headers as Record<string, unknown>);
+    if (!auth.ok) {
+      return reply.code(auth.status).send({ error: auth.error });
+    }
+    const principal = auth.principal;
+    const objectives = await deps.objectiveService.list(
+      principal.organizationId,
+      OBJECTIVE_LIST_LIMIT,
+    );
+    const visible = objectives.filter(
+      (objective) =>
+        evaluate({
+          principal,
+          action: OBJECTIVE_READ_ACTION,
+          resource: objectiveResource(objective, principal),
+        }).effect === 'allow',
+    );
+    return { objectives: visible };
+  });
+
   app.post('/objectives', async (request, reply) => {
     const auth = await deps.authenticate(request.headers as Record<string, unknown>);
     if (!auth.ok) {
@@ -171,14 +228,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     // PRIVATE objective is owner-only; TEAM/PROJECT are member-only. An
     // unauthorized resource reads as `not_found` — identical to a missing one —
     // so a caller can't probe for the existence of objectives they can't see.
-    const resource: ResourceDescriptor = {
-      organizationId: principal.organizationId,
-      scope: objective.scope,
-      ownerUserId: objective.ownerId,
-      ...(objective.projectId !== undefined ? { projectId: objective.projectId } : {}),
-      ...(objective.teamId !== undefined ? { teamId: objective.teamId } : {}),
-    };
-    const decision = evaluate({ principal, action: OBJECTIVE_READ_ACTION, resource });
+    const decision = evaluate({
+      principal,
+      action: OBJECTIVE_READ_ACTION,
+      resource: objectiveResource(objective, principal),
+    });
     if (decision.effect !== 'allow') {
       return reply.code(404).send({ error: 'not_found' });
     }
@@ -292,6 +346,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
       return reply.code(404).send({ error: 'not_found' });
     });
+  } else {
+    // No bundle: say so at `/` rather than a bare JSON 404, so a deploy that
+    // missed the web build is diagnosable from the browser.
+    app.get('/', async (_request, reply) =>
+      reply
+        .type('text/html; charset=utf-8')
+        .send(
+          '<!doctype html><title>Donna</title><p>The DONNA API is running, but the web app ' +
+            'bundle was not found. Check that the build ran <code>pnpm run build</code> ' +
+            '(it produces <code>apps/web/dist</code>) and see the startup log.</p>',
+        ),
+    );
   }
 
   return app;

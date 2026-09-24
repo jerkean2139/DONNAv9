@@ -1,7 +1,8 @@
-import type { ApprovalView, HealthView, NavSection, ObjectiveView, WorkItemView } from '../types';
+import type { ApprovalView, HealthView, NavSection, WorkItemView } from '../types';
 
-// Placeholder data for the shell until the control-plane API is wired.
-// Clearly mock — replaced by live event/task projections (Technical Plan §4.2).
+// Placeholder data for the panels not yet backed by the API (objectives and
+// control-plane health are live). Clearly mock — replaced by live event/task
+// projections (Technical Plan §4.2).
 
 export const NAV_SECTIONS: NavSection[] = [
   { key: 'today', label: 'Today' },
@@ -12,12 +13,6 @@ export const NAV_SECTIONS: NavSection[] = [
   { key: 'memory', label: 'Memory & Knowledge' },
   { key: 'automations', label: 'Automations' },
 ];
-
-export const MOCK_OBJECTIVE: ObjectiveView = {
-  id: 'obj-demo',
-  requestedOutcome: 'Get Route 40 ready for launch',
-  status: 'active',
-};
 
 export const MOCK_WORK: WorkItemView[] = [
   { id: 'w1', label: 'Draft launch checklist', worker: 'local-ai', state: 'running' },
