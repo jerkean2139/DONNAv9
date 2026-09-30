@@ -20,3 +20,18 @@ body {
     Arial,
     sans-serif;
 }
+
+/* Keep content clear of the notch and home indicator when launched from the
+   iOS Home Screen (viewport-fit=cover + black-translucent status bar). */
+.safe-top {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.safe-x {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}

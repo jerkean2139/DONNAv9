@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { ApprovalView, ObjectiveView, WorkItemView } from '../types';
+import { DonnaAvatar } from './DonnaAvatar';
 
 interface Props {
   objective: ObjectiveView | null;
@@ -22,7 +23,17 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Props) {
   const blockers = work.filter((w) => w.state === 'blocked');
   return (
-    <aside className="overflow-auto border-l border-edge bg-panel" aria-label="Donna rail">
+    <aside
+      className="border-t border-edge bg-panel md:overflow-auto md:border-l md:border-t-0"
+      aria-label="Donna rail"
+    >
+      <section className="flex items-center gap-3 border-b border-edge px-4 py-4">
+        <DonnaAvatar size={48} />
+        <div>
+          <div className="text-sm font-semibold text-ink">Donna</div>
+          <div className="text-xs text-muted">Here&apos;s where things stand.</div>
+        </div>
+      </section>
       <Group title="Objective">
         {objective === null ? (
           <span className="text-muted">None yet</span>
