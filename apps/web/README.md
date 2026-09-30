@@ -4,15 +4,22 @@ The command-first web experience (Technical Plan §8 / UX spec). Vite + React +
 TypeScript + Tailwind. Donna dominates the shell — not a chat panel inside a
 project manager (Build Bible V2-001).
 
-## Layout
+## Design
 
-Mobile-first, installable (PWA):
+"The Daily Brief" — Donna as a private morning paper written by your chief of
+staff, not another dark-mode dashboard:
 
-- **Phones** — an app bar with Donna and her live presence, the current
-  section, the command composer, and a bottom tab bar (Today, Projects, Tasks,
-  Leads, More).
-- **Desktop** — a sidebar with every section, the same feed and composer in a
-  centered column, and an "At a glance" summary on wide screens.
+- **Type:** Instrument Serif headlines, Instrument Sans body, IBM Plex Mono
+  labels — self-hosted in `public/fonts` (SIL OFL) so the installed app works
+  offline and makes no third-party requests.
+- **Color:** warm ink paper (`#0e0d0b`), cream type (`#efe8dc`), one ember
+  accent (`#ff5b2e`), a film-grain overlay and an ember wash behind the masthead.
+- **Voice:** Donna speaks in the first person ("Nothing's on fire. Tell me what
+  we're getting done.").
+- **Phone:** a masthead with the date, Donna's greeting and byline, a numbered
+  agenda, a cream composer, and word-only tabs with an ember tick.
+- **Desktop:** a numbered table-of-contents sidebar, the brief in a centered
+  column, and a "By the numbers" box score on wide screens.
 
 ## Live data
 

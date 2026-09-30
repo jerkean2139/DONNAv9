@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="106 70 300 300">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1d2d52"/>
-      <stop offset="1" stop-color="#0b0e14"/>
+      <stop offset="0" stop-color="#2b1a12"/>
+      <stop offset="1" stop-color="#0e0d0b"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.5" cy="0.45" r="0.5">
-      <stop offset="0" stop-color="#5b8def" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#5b8def" stop-opacity="0"/>
+      <stop offset="0" stop-color="#ff6a3d" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#ff5b2e" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#f1c6a4"/>
       <stop offset="1" stop-color="#dfa783"/>
     </linearGradient>
     <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4a2c1c"/>
+      <stop offset="0" stop-color="#5e3824"/>
       <stop offset="1" stop-color="#1c110a"/>
     </linearGradient>
     <linearGradient id="blazer" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1f2b44"/>
-      <stop offset="1" stop-color="#141c2e"/>
+      <stop offset="0" stop-color="#23201c"/>
+      <stop offset="1" stop-color="#151310"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
@@ -32,10 +32,10 @@
   <path d="M228 318 C246 330 266 330 284 318 L284 300 L228 300 Z" fill="#c48a68" opacity="0.6"/>
 
   <!-- blazer with lapels over an accent top -->
-  <path d="M88 512 C92 420 160 372 256 372 C352 372 420 420 424 512 Z" fill="url(#blazer)" stroke="#3a4f7a" stroke-width="4"/>
-  <path d="M212 374 L256 452 L300 374 C286 368 226 368 212 374 Z" fill="#5b8def"/>
-  <path d="M212 374 L180 392 L226 470 L256 452 Z" fill="#2a3a5c"/>
-  <path d="M300 374 L332 392 L286 470 L256 452 Z" fill="#2a3a5c"/>
+  <path d="M88 512 C92 420 160 372 256 372 C352 372 420 420 424 512 Z" fill="url(#blazer)" stroke="#3d3730" stroke-width="4"/>
+  <path d="M212 374 L256 452 L300 374 C286 368 226 368 212 374 Z" fill="#ff5b2e"/>
+  <path d="M212 374 L180 392 L226 470 L256 452 Z" fill="#2e2a25"/>
+  <path d="M300 374 L332 392 L286 470 L256 452 Z" fill="#2e2a25"/>
 
   <!-- face -->
   <path d="M166 214 C166 150 206 118 256 118 C306 118 346 150 346 214 C346 282 306 334 256 334 C206 334 166 282 166 214 Z" fill="url(#skin)"/>

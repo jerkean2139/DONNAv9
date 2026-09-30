@@ -1,53 +1,38 @@
-import {
-  AutomationsIcon,
-  LeadsIcon,
-  MemoryIcon,
-  PeopleIcon,
-  ProjectsIcon,
-  TasksIcon,
-  TodayIcon,
-} from '../components/icons';
 import type { NavSection } from '../types';
 
 // The app's sections. Only Today is backed by the API so far; the others show
 // an honest "not connected yet" state instead of fabricated data.
 export const SECTIONS: NavSection[] = [
-  { key: 'today', label: 'Today', icon: TodayIcon, live: true },
+  { key: 'today', label: 'Today', live: true },
   {
     key: 'projects',
     label: 'Projects',
-    icon: ProjectsIcon,
-    blurb: 'Group objectives into projects and see how each one is tracking.',
+    blurb: 'Your objectives, grouped into the bigger bets they serve.',
   },
   {
     key: 'tasks',
     label: 'Tasks',
-    icon: TasksIcon,
-    blurb: 'The work Donna and your team are doing to deliver your objectives.',
+    blurb: 'Everything I and the team are doing to get your objectives over the line.',
   },
   {
     key: 'leads',
     label: 'Leads',
-    icon: LeadsIcon,
-    blurb: 'Your pipeline from GoHighLevel, with Donna’s suggested follow-ups.',
+    blurb: 'Your pipeline from GoHighLevel — and who I think you should call first.',
   },
   {
     key: 'people',
     label: 'People',
-    icon: PeopleIcon,
-    blurb: 'Clients, partners and your team — everyone Donna works with.',
+    blurb: 'Clients, partners and your team. I remember everyone so you don’t have to.',
   },
   {
     key: 'memory',
-    label: 'Memory & Knowledge',
-    icon: MemoryIcon,
-    blurb: 'What Donna knows about your business, and where she learned it.',
+    label: 'Memory',
+    blurb: 'What I know about your business, and exactly where I learned it.',
   },
   {
     key: 'automations',
     label: 'Automations',
-    icon: AutomationsIcon,
-    blurb: 'Recurring work Donna runs for you on a schedule.',
+    blurb: 'The recurring work I run for you while you sleep.',
   },
 ];
 

@@ -1,5 +1,3 @@
-import type { ComponentType, SVGProps } from 'react';
-
 // View-model types for the command experience. These mirror the control-plane
 // domain shapes; the typed client returns these directly. (apps/web stays
 // behind the API boundary — it never imports @donna/db or @donna/policy;
@@ -21,9 +19,8 @@ export type AuthMode = 'clerk' | 'dev' | 'unconfigured';
 export interface NavSection {
   key: string;
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** True when the section is backed by live data. */
   live?: boolean;
-  /** One line describing the section while it is not connected yet. */
+  /** Donna's one-line pitch for the section while it is not connected yet. */
   blurb?: string;
 }
