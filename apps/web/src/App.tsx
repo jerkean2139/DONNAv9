@@ -1,26 +1,25 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { ApiError, type ControlPlaneClient } from './api/client';
-import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { CommandBar, type CommandStatus } from './components/CommandBar';
-import { ContextNav } from './components/ContextNav';
-import { DonnaRail } from './components/DonnaRail';
-import { HealthBar } from './components/HealthBar';
-import {
-  MOCK_ALERTS,
-  MOCK_APPROVALS,
-  MOCK_HEALTH,
-  MOCK_NEXT_ACTION,
-  MOCK_WORK,
-  NAV_SECTIONS,
-} from './data/mock';
-import type { HealthView, ObjectiveView } from './types';
+import { GlanceCard } from './components/GlanceCard';
+import { MoreView } from './components/MoreView';
+import { SectionPlaceholder } from './components/SectionPlaceholder';
+import { Sidebar } from './components/Sidebar';
+import { TabBar } from './components/TabBar';
+import { TodayView } from './components/TodayView';
+import { TopBar } from './components/TopBar';
+import { PRIMARY_TABS, SECTIONS } from './data/sections';
+import type { AuthMode, ControlPlaneHealth, ObjectiveView } from './types';
 
 const HEALTH_POLL_MS = 30_000;
+const NOTICE_MS = 3_000;
 
 interface Props {
   client: ControlPlaneClient;
-  /** Rendered at the right of the health bar (e.g. the signed-in user). */
+  /** How requests are signed; 'unconfigured' disables commands up front. */
+  authMode?: AuthMode;
+  /** The signed-in user's control (e.g. Clerk's UserButton or a dev badge). */
   account?: ReactNode;
 }
 
@@ -37,23 +36,20 @@ function describeError(error: unknown): string {
   return 'Could not reach the DONNA API.';
 }
 
-export function App({ client, account }: Props) {
-  const [activeKey, setActiveKey] = useState('today');
+export function App({ client, authMode = 'dev', account }: Props) {
+  const [active, setActive] = useState('today');
   const [objectives, setObjectives] = useState<ObjectiveView[]>([]);
-  const [controlPlane, setControlPlane] = useState<HealthView['controlPlane']>('checking');
+  const [loading, setLoading] = useState(authMode !== 'unconfigured');
+  const [health, setHealth] = useState<ControlPlaneHealth>('checking');
   const [status, setStatus] = useState<CommandStatus>({ kind: 'idle' });
-
-  const activeSection = useMemo(
-    () => NAV_SECTIONS.find((s) => s.key === activeKey) ?? NAV_SECTIONS[0]!,
-    [activeKey],
-  );
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number }>();
 
   const checkHealth = useCallback(async () => {
     try {
       const res = await client.health();
-      setControlPlane(res.status === 'ok' ? 'ok' : 'degraded');
+      setHealth(res.status === 'ok' ? 'ok' : 'degraded');
     } catch {
-      setControlPlane('down');
+      setHealth('down');
     }
   }, [client]);
 
@@ -64,19 +60,31 @@ export function App({ client, account }: Props) {
   }, [checkHealth]);
 
   useEffect(() => {
+    if (authMode === 'unconfigured') return;
     let cancelled = false;
     client.listObjectives().then(
       (list) => {
-        if (!cancelled) setObjectives(list);
+        if (cancelled) return;
+        setObjectives(list);
+        setLoading(false);
       },
       (error: unknown) => {
-        if (!cancelled) setStatus({ kind: 'error', message: describeError(error) });
+        if (cancelled) return;
+        setLoading(false);
+        setStatus({ kind: 'error', message: describeError(error) });
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [client]);
+  }, [client, authMode]);
+
+  // Confirmations fade on their own; errors stay until the next action.
+  useEffect(() => {
+    if (status.kind !== 'notice') return;
+    const timer = setTimeout(() => setStatus({ kind: 'idle' }), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   async function handleCommand(text: string): Promise<boolean> {
     setStatus({ kind: 'sending' });
@@ -95,6 +103,7 @@ export function App({ client, account }: Props) {
         return true;
       }
       setObjectives((prev) => [result.objective, ...prev]);
+      setActive('today');
       setStatus({ kind: 'notice', message: 'Objective created.' });
       return true;
     } catch (error) {
@@ -103,30 +112,52 @@ export function App({ client, account }: Props) {
     }
   }
 
-  const current = objectives[0] ?? null;
+  const tabs = SECTIONS.filter((s) => PRIMARY_TABS.includes(s.key));
+  const overflow = SECTIONS.filter((s) => !PRIMARY_TABS.includes(s.key));
+  const section = SECTIONS.find((s) => s.key === active);
+  const moreActive = active === 'more' || overflow.some((s) => s.key === active);
+
+  let view: ReactNode;
+  if (active === 'more') {
+    view = <MoreView sections={overflow} onSelect={setActive} />;
+  } else if (section === undefined || section.live === true) {
+    view = (
+      <TodayView
+        objectives={objectives}
+        loading={loading}
+        authMode={authMode}
+        onSuggest={(text) => setPrefill({ text, nonce: Date.now() })}
+      />
+    );
+  } else {
+    view = <SectionPlaceholder section={section} />;
+  }
 
   return (
-    <div className="grid h-dvh grid-rows-[auto_1fr_auto] bg-surface text-ink">
-      <HealthBar health={{ ...MOCK_HEALTH, controlPlane }} account={account} />
-      {/* Phones: nav tabs, workspace and rail stack and scroll together.
-          Desktop: three columns that scroll independently. */}
-      <div className="flex min-h-0 flex-col overflow-auto md:grid md:grid-cols-[220px_1fr_300px] md:overflow-hidden">
-        <ContextNav sections={NAV_SECTIONS} active={activeKey} onSelect={setActiveKey} />
-        <ActiveWorkspace
-          section={activeSection}
-          objective={current}
-          objectives={objectives}
-          work={MOCK_WORK}
+    <div className="flex h-dvh flex-col bg-surface text-ink">
+      <TopBar health={health} account={account} />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          sections={SECTIONS}
+          active={active}
+          onSelect={setActive}
+          health={health}
+          account={account}
         />
-        <DonnaRail
-          objective={current}
-          work={MOCK_WORK}
-          approvals={MOCK_APPROVALS}
-          alerts={MOCK_ALERTS}
-          nextAction={MOCK_NEXT_ACTION}
-        />
+        <main className="flex min-w-0 flex-1 flex-col" aria-label="Workspace">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{view}</div>
+          {active !== 'more' && (
+            <CommandBar
+              onSubmit={handleCommand}
+              status={status}
+              {...(prefill !== undefined ? { prefill } : {})}
+              {...(authMode === 'unconfigured' ? { disabledReason: 'Sign-in required' } : {})}
+            />
+          )}
+        </main>
+        <GlanceCard objectives={objectives} />
       </div>
-      <CommandBar onSubmit={handleCommand} status={status} />
+      <TabBar tabs={tabs} active={active} moreActive={moreActive} onSelect={setActive} />
     </div>
   );
 }

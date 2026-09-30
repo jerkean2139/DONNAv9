@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,7 +10,7 @@ function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneCl
   let seq = 0;
   return {
     health: vi.fn().mockResolvedValue({ status: 'ok' }),
-    clientConfig: vi.fn().mockResolvedValue({ auth: 'unconfigured' }),
+    clientConfig: vi.fn().mockResolvedValue({ auth: 'dev' }),
     listObjectives: vi.fn().mockResolvedValue([]),
     createObjective: vi.fn(async ({ requestedOutcome }: { requestedOutcome: string }) => {
       seq += 1;
@@ -22,18 +22,18 @@ function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneCl
 }
 
 describe('App shell', () => {
-  it('renders the command-first regions', async () => {
+  it('renders navigation, the workspace and the command composer', async () => {
     render(<App client={fakeClient()} />);
-    await screen.findByText('ok');
-    expect(screen.getByLabelText('Context')).toBeInTheDocument();
-    expect(screen.getByLabelText('Active workspace')).toBeInTheDocument();
-    expect(screen.getByLabelText('Donna rail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sections')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tabs')).toBeInTheDocument();
+    expect(screen.getByLabelText('Workspace')).toBeInTheDocument();
     expect(screen.getByLabelText('Command Donna')).toBeInTheDocument();
+    expect(await screen.findByText(/Nothing in motion yet/)).toBeInTheDocument();
   });
 
-  it('shows live control-plane health', async () => {
+  it('shows Donna as online from the live health check', async () => {
     render(<App client={fakeClient()} />);
-    expect(await screen.findByText('ok')).toBeInTheDocument();
+    expect((await screen.findAllByText('Online')).length).toBeGreaterThan(0);
   });
 
   it('loads existing objectives from the API', async () => {
@@ -43,13 +43,16 @@ describe('App shell', () => {
         .mockResolvedValue([{ id: 'o1', requestedOutcome: 'Ship Route 40', status: 'active' }]),
     });
     render(<App client={client} />);
-    expect(await screen.findAllByText('Ship Route 40')).not.toHaveLength(0);
+    const list = await screen.findByRole('list', { name: 'Objectives' });
+    expect(within(list).getByText('Ship Route 40')).toBeInTheDocument();
+    expect(within(list).getByText('In progress')).toBeInTheDocument();
   });
 
   it('creates an objective through the API from a typed command', async () => {
     const user = userEvent.setup();
     const client = fakeClient();
     render(<App client={client} />);
+    await screen.findByText(/Nothing in motion yet/);
     const input = screen.getByLabelText('Command Donna');
     await user.type(input, 'Launch the new site{Enter}');
 
@@ -57,8 +60,16 @@ describe('App shell', () => {
       expect.objectContaining({ requestedOutcome: 'Launch the new site' }),
     );
     expect(await screen.findByText('Objective created.')).toBeInTheDocument();
-    expect(screen.getAllByText('Launch the new site')).not.toHaveLength(0);
+    const list = screen.getByRole('list', { name: 'Objectives' });
+    expect(within(list).getByText('Launch the new site')).toBeInTheDocument();
     expect(input).toHaveValue('');
+  });
+
+  it('fills the composer from a suggestion', async () => {
+    const user = userEvent.setup();
+    render(<App client={fakeClient()} />);
+    await user.click(await screen.findByRole('button', { name: 'Plan next week’s priorities' }));
+    expect(screen.getByLabelText('Command Donna')).toHaveValue('Plan next week’s priorities');
   });
 
   it('keeps the command and explains when the API refuses it', async () => {
@@ -67,6 +78,7 @@ describe('App shell', () => {
       createObjective: vi.fn().mockRejectedValue(new ApiError(401, 'missing_bearer_token')),
     });
     render(<App client={client} />);
+    await screen.findByText(/Nothing in motion yet/);
     const input = screen.getByLabelText('Command Donna');
     await user.type(input, 'Launch the new site{Enter}');
 
@@ -74,11 +86,33 @@ describe('App shell', () => {
     expect(input).toHaveValue('Launch the new site');
   });
 
-  it('switches the active context section', async () => {
+  it('explains missing sign-in up front and disables commands', async () => {
+    const client = fakeClient();
+    render(<App client={client} authMode="unconfigured" />);
+    expect(screen.getByRole('note')).toHaveTextContent('Sign-in isn’t set up yet');
+    expect(screen.getByLabelText('Command Donna')).toBeDisabled();
+    expect(client.listObjectives).not.toHaveBeenCalled();
+    await screen.findAllByText('Online');
+  });
+
+  it('shows a not-connected state for sections without live data', async () => {
     const user = userEvent.setup();
     render(<App client={fakeClient()} />);
-    await screen.findByText('ok');
-    await user.click(screen.getByRole('button', { name: 'Leads' }));
+    await screen.findByText(/Nothing in motion yet/);
+    const sidebar = screen.getByLabelText('Sections');
+    await user.click(within(sidebar).getByRole('button', { name: /Leads/ }));
     expect(screen.getByRole('heading', { name: 'Leads' })).toBeInTheDocument();
+    expect(screen.getByText('Not connected yet')).toBeInTheDocument();
+  });
+
+  it('lists overflow sections under More on phones', async () => {
+    const user = userEvent.setup();
+    render(<App client={fakeClient()} />);
+    await screen.findByText(/Nothing in motion yet/);
+    const tabs = screen.getByLabelText('Tabs');
+    await user.click(within(tabs).getByRole('button', { name: /More/ }));
+    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument();
+    const workspace = screen.getByLabelText('Workspace');
+    expect(within(workspace).getByRole('button', { name: /Automations/ })).toBeInTheDocument();
   });
 });

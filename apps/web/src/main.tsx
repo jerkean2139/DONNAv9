@@ -16,8 +16,11 @@ const baseUrl = import.meta.env.VITE_API_URL ?? '';
 
 function DevBadge() {
   return (
-    <span className="rounded border border-amber-400/50 px-1.5 py-0.5 text-amber-400">
-      dev identity
+    <span
+      title="Development identity — not real sign-in"
+      className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning ring-1 ring-inset ring-warning/30"
+    >
+      Dev
     </span>
   );
 }
@@ -40,10 +43,10 @@ function shellFor(config: AuthConfig): ReactNode {
       baseUrl,
       principalHeaders: devPrincipalHeaders(config.devPrincipal),
     });
-    return <App client={client} account={<DevBadge />} />;
+    return <App client={client} authMode="dev" account={<DevBadge />} />;
   }
   // No sign-in configured: still show the shell; commands explain the 401.
-  return <App client={new ControlPlaneClient({ baseUrl })} />;
+  return <App client={new ControlPlaneClient({ baseUrl })} authMode="unconfigured" />;
 }
 
 async function boot(): Promise<ReactNode> {

@@ -4,23 +4,21 @@ The command-first web experience (Technical Plan §8 / UX spec). Vite + React +
 TypeScript + Tailwind. Donna dominates the shell — not a chat panel inside a
 project manager (Build Bible V2-001).
 
-## Layout (the five regions)
+## Layout
 
-- **Top** — health/status bar: control plane, active jobs, node modes/health.
-- **Left** — context navigation: Today, Projects, People, Leads, Tasks,
-  Memory & Knowledge, Automations.
-- **Center** — Active Workspace: current objective, active work, and outcomes
-  you express via the command bar (staged as draft objectives).
-- **Right** — Donna Rail: objective, active work, blockers, approvals, alerts,
-  next recommended action.
-- **Bottom** — the persistent command bar: express an outcome; Donna turns it
-  into an objective.
+Mobile-first, installable (PWA):
+
+- **Phones** — an app bar with Donna and her live presence, the current
+  section, the command composer, and a bottom tab bar (Today, Projects, Tasks,
+  Leads, More).
+- **Desktop** — a sidebar with every section, the same feed and composer in a
+  centered column, and an "At a glance" summary on wide screens.
 
 ## Live data
 
 Objectives (list + create from the command bar) and control-plane health are
-live. The remaining panels (active work, approvals, alerts, nodes) still render
-from `src/data/mock.ts` and are labeled "(sample)" until their APIs exist.
+live. Sections without an API yet (Projects, Tasks, Leads, People, Memory,
+Automations) show an honest "Not connected yet" state — no fabricated data.
 `apps/web` stays behind the API boundary — it never imports `@donna/db` or
 `@donna/policy` (enforced in CI).
 
