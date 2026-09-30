@@ -106,9 +106,11 @@ export function App({ client, account }: Props) {
   const current = objectives[0] ?? null;
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface text-ink">
+    <div className="grid h-dvh grid-rows-[auto_1fr_auto] bg-surface text-ink">
       <HealthBar health={{ ...MOCK_HEALTH, controlPlane }} account={account} />
-      <div className="grid min-h-0 grid-cols-[220px_1fr_300px]">
+      {/* Phones: nav tabs, workspace and rail stack and scroll together.
+          Desktop: three columns that scroll independently. */}
+      <div className="flex min-h-0 flex-col overflow-auto md:grid md:grid-cols-[220px_1fr_300px] md:overflow-hidden">
         <ContextNav sections={NAV_SECTIONS} active={activeKey} onSelect={setActiveKey} />
         <ActiveWorkspace
           section={activeSection}

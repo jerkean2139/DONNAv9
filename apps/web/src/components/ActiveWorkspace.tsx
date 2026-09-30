@@ -1,4 +1,5 @@
 import type { NavSection, ObjectiveView, WorkItemView } from '../types';
+import { DonnaAvatar } from './DonnaAvatar';
 
 interface Props {
   section: NavSection;
@@ -10,14 +11,15 @@ interface Props {
 
 export function ActiveWorkspace({ section, objective, objectives, work }: Props) {
   return (
-    <main className="min-w-0 overflow-auto p-6" aria-label="Active workspace">
+    <main className="min-w-0 p-4 md:overflow-auto md:p-6" aria-label="Active workspace">
       <h1 className="text-lg font-semibold text-ink">{section.label}</h1>
 
       <section className="mt-4 rounded-lg border border-edge bg-panel p-4">
         <div className="text-xs uppercase tracking-wide text-muted">Current objective</div>
         {objective === null ? (
-          <div className="mt-1 text-muted">
-            No objectives yet — tell Donna an outcome in the command bar below.
+          <div className="mt-2 flex items-center gap-3 text-muted">
+            <DonnaAvatar size={40} />
+            <span>No objectives yet — tell me an outcome in the command bar below.</span>
           </div>
         ) : (
           <>
@@ -34,7 +36,7 @@ export function ActiveWorkspace({ section, objective, objectives, work }: Props)
             {objectives.map((o) => (
               <li
                 key={o.id}
-                className="flex items-center justify-between rounded border border-edge bg-panel px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded border border-edge bg-panel px-3 py-2 text-sm"
               >
                 <span className="text-ink">{o.requestedOutcome}</span>
                 <span className="text-muted">{o.status}</span>
