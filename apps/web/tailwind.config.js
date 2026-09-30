@@ -3,22 +3,38 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // "Daily briefing" palette: warm ink paper, cream type, one ember accent.
       colors: {
-        surface: '#0b0e14',
-        panel: '#121826',
-        raised: '#182033',
-        edge: '#222b3d',
-        ink: '#e8edf5',
-        muted: '#8b98a9',
-        faint: '#5d6878',
-        accent: '#6d9bff',
-        'accent-strong': '#4f7ff0',
-        success: '#34d399',
-        warning: '#fbbf24',
-        danger: '#f87171',
+        surface: '#0e0d0b',
+        panel: '#161411',
+        raised: '#1f1c18',
+        edge: '#2c2823',
+        ink: '#efe8dc',
+        muted: '#a39a8c',
+        faint: '#6d665c',
+        accent: '#ff5b2e',
+        success: '#a3d977',
+        warning: '#f4b740',
+        danger: '#ff6b5b',
       },
-      boxShadow: {
-        card: '0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px -12px rgba(0,0,0,0.6)',
+      fontFamily: {
+        serif: ['"Instrument Serif"', 'ui-serif', 'Georgia', 'serif'],
+        sans: ['"Instrument Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      keyframes: {
+        rise: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        breathe: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
+        },
+      },
+      animation: {
+        rise: 'rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both',
+        breathe: 'breathe 2.4s ease-in-out infinite',
       },
     },
   },

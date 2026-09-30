@@ -28,7 +28,7 @@ describe('App shell', () => {
     expect(screen.getByLabelText('Tabs')).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toBeInTheDocument();
     expect(screen.getByLabelText('Command Donna')).toBeInTheDocument();
-    expect(await screen.findByText(/Nothing in motion yet/)).toBeInTheDocument();
+    expect(await screen.findByText('The agenda is clear.')).toBeInTheDocument();
   });
 
   it('shows Donna as online from the live health check', async () => {
@@ -45,21 +45,21 @@ describe('App shell', () => {
     render(<App client={client} />);
     const list = await screen.findByRole('list', { name: 'Objectives' });
     expect(within(list).getByText('Ship Route 40')).toBeInTheDocument();
-    expect(within(list).getByText('In progress')).toBeInTheDocument();
+    expect(within(list).getByText('In motion')).toBeInTheDocument();
   });
 
   it('creates an objective through the API from a typed command', async () => {
     const user = userEvent.setup();
     const client = fakeClient();
     render(<App client={client} />);
-    await screen.findByText(/Nothing in motion yet/);
+    await screen.findByText('The agenda is clear.');
     const input = screen.getByLabelText('Command Donna');
     await user.type(input, 'Launch the new site{Enter}');
 
     expect(client.createObjective).toHaveBeenCalledWith(
       expect.objectContaining({ requestedOutcome: 'Launch the new site' }),
     );
-    expect(await screen.findByText('Objective created.')).toBeInTheDocument();
+    expect(await screen.findByText('Got it — it’s on the agenda.')).toBeInTheDocument();
     const list = screen.getByRole('list', { name: 'Objectives' });
     expect(within(list).getByText('Launch the new site')).toBeInTheDocument();
     expect(input).toHaveValue('');
@@ -78,7 +78,7 @@ describe('App shell', () => {
       createObjective: vi.fn().mockRejectedValue(new ApiError(401, 'missing_bearer_token')),
     });
     render(<App client={client} />);
-    await screen.findByText(/Nothing in motion yet/);
+    await screen.findByText('The agenda is clear.');
     const input = screen.getByLabelText('Command Donna');
     await user.type(input, 'Launch the new site{Enter}');
 
@@ -90,6 +90,7 @@ describe('App shell', () => {
     const client = fakeClient();
     render(<App client={client} authMode="unconfigured" />);
     expect(screen.getByRole('note')).toHaveTextContent('Sign-in isn’t set up yet');
+    expect(screen.getByRole('note')).toHaveTextContent('CLERK_PUBLISHABLE_KEY');
     expect(screen.getByLabelText('Command Donna')).toBeDisabled();
     expect(client.listObjectives).not.toHaveBeenCalled();
     await screen.findAllByText('Online');
@@ -98,7 +99,7 @@ describe('App shell', () => {
   it('shows a not-connected state for sections without live data', async () => {
     const user = userEvent.setup();
     render(<App client={fakeClient()} />);
-    await screen.findByText(/Nothing in motion yet/);
+    await screen.findByText('The agenda is clear.');
     const sidebar = screen.getByLabelText('Sections');
     await user.click(within(sidebar).getByRole('button', { name: /Leads/ }));
     expect(screen.getByRole('heading', { name: 'Leads' })).toBeInTheDocument();
@@ -108,7 +109,7 @@ describe('App shell', () => {
   it('lists overflow sections under More on phones', async () => {
     const user = userEvent.setup();
     render(<App client={fakeClient()} />);
-    await screen.findByText(/Nothing in motion yet/);
+    await screen.findByText('The agenda is clear.');
     const tabs = screen.getByLabelText('Tabs');
     await user.click(within(tabs).getByRole('button', { name: /More/ }));
     expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument();

@@ -104,7 +104,7 @@ export function App({ client, authMode = 'dev', account }: Props) {
       }
       setObjectives((prev) => [result.objective, ...prev]);
       setActive('today');
-      setStatus({ kind: 'notice', message: 'Objective created.' });
+      setStatus({ kind: 'notice', message: 'Got it — it’s on the agenda.' });
       return true;
     } catch (error) {
       setStatus({ kind: 'error', message: describeError(error) });
@@ -130,11 +130,11 @@ export function App({ client, authMode = 'dev', account }: Props) {
       />
     );
   } else {
-    view = <SectionPlaceholder section={section} />;
+    view = <SectionPlaceholder section={section} index={SECTIONS.indexOf(section)} />;
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-surface text-ink">
+    <div className="grain ember-wash relative flex h-dvh flex-col bg-surface text-ink">
       <TopBar health={health} account={account} />
       <div className="flex min-h-0 flex-1">
         <Sidebar
@@ -144,7 +144,7 @@ export function App({ client, authMode = 'dev', account }: Props) {
           health={health}
           account={account}
         />
-        <main className="flex min-w-0 flex-1 flex-col" aria-label="Workspace">
+        <main className="relative z-10 flex min-w-0 flex-1 flex-col" aria-label="Workspace">
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{view}</div>
           {active !== 'more' && (
             <CommandBar

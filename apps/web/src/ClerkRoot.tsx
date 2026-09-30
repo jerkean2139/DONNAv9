@@ -51,7 +51,7 @@ export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <ClerkLoading>
-        <div className="flex h-dvh items-center justify-center bg-surface text-sm text-muted">
+        <div className="flex h-dvh items-center justify-center bg-surface font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
           Loading sign-in…
         </div>
       </ClerkLoading>
@@ -59,10 +59,15 @@ export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
         <SignedInApp {...(jwtTemplate !== undefined ? { jwtTemplate } : {})} />
       </SignedIn>
       <SignedOut>
-        <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-4">
+        <div className="grain ember-wash safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-4">
           <div className="flex flex-col items-center gap-3 text-center">
             <DonnaAvatar size={72} />
-            <div className="text-xl font-semibold text-ink">Sign in to Donna</div>
+            <div className="font-serif text-[40px] leading-none text-ink">
+              Hello, <em className="text-accent">you</em>.
+            </div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+              Sign in to your daily brief
+            </p>
           </div>
           <SignIn />
         </div>

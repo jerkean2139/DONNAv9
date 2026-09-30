@@ -1,19 +1,20 @@
 import type { ObjectiveStatus } from '../types';
 
-const STYLE: Record<ObjectiveStatus, { label: string; className: string }> = {
-  draft: { label: 'Draft', className: 'bg-accent/10 text-accent ring-accent/25' },
-  active: { label: 'In progress', className: 'bg-success/10 text-success ring-success/25' },
-  blocked: { label: 'Blocked', className: 'bg-warning/10 text-warning ring-warning/25' },
-  completed: { label: 'Done', className: 'bg-edge text-muted ring-edge' },
-  cancelled: { label: 'Cancelled', className: 'bg-edge text-faint ring-edge' },
+const STYLE: Record<ObjectiveStatus, { label: string; dot: string; text: string }> = {
+  draft: { label: 'Draft', dot: 'border border-ink/60', text: 'text-muted' },
+  active: { label: 'In motion', dot: 'bg-accent animate-breathe', text: 'text-accent' },
+  blocked: { label: 'Blocked', dot: 'bg-warning', text: 'text-warning' },
+  completed: { label: 'Done', dot: 'bg-success', text: 'text-success' },
+  cancelled: { label: 'Cancelled', dot: 'bg-faint', text: 'text-faint line-through' },
 };
 
 export function StatusChip({ status }: { status: ObjectiveStatus }) {
   const s = STYLE[status];
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${s.className}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] ${s.text}`}
     >
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
       {s.label}
     </span>
   );

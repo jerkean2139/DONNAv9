@@ -18,7 +18,7 @@ function DevBadge() {
   return (
     <span
       title="Development identity — not real sign-in"
-      className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning ring-1 ring-inset ring-warning/30"
+      className="rounded-full border border-warning/40 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warning"
     >
       Dev
     </span>

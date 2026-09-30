@@ -1,5 +1,4 @@
 import type { NavSection } from '../types';
-import { MoreIcon } from './icons';
 
 interface Props {
   tabs: NavSection[];
@@ -9,31 +8,33 @@ interface Props {
   onSelect: (key: string) => void;
 }
 
-/** Phone bottom tab bar (iOS-style), clear of the home indicator. */
+/** Phone tab bar — words, not icons; an ember tick marks where you are. */
 export function TabBar({ tabs, active, moreActive, onSelect }: Props) {
   const items = [
-    ...tabs.map((t) => ({ key: t.key, label: t.label, Icon: t.icon })),
-    { key: 'more', label: 'More', Icon: MoreIcon },
+    ...tabs.map((t) => ({ key: t.key, label: t.label })),
+    { key: 'more', label: 'More' },
   ];
   return (
-    <nav
-      aria-label="Tabs"
-      className="safe-bottom shrink-0 border-t border-edge/70 bg-surface/95 backdrop-blur md:hidden"
-    >
-      <ul className="flex">
-        {items.map(({ key, label, Icon }) => {
+    <nav aria-label="Tabs" className="safe-bottom relative z-10 shrink-0 md:hidden">
+      <ul className="safe-x flex justify-between">
+        {items.map(({ key, label }) => {
           const selected = key === 'more' ? moreActive : active === key;
           return (
-            <li key={key} className="flex-1">
+            <li key={key}>
               <button
                 type="button"
                 onClick={() => onSelect(key)}
                 aria-current={selected ? 'page' : undefined}
-                className={`flex w-full flex-col items-center gap-1 pb-1.5 pt-2 text-[11px] ${
-                  selected ? 'text-accent' : 'text-faint'
+                className={`relative flex flex-col items-center px-1 pb-2 pt-3 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+                  selected ? 'text-ink' : 'text-faint'
                 }`}
               >
-                <Icon />
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-0 h-[3px] w-5 rounded-full bg-accent transition-opacity ${
+                    selected ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
                 {label}
               </button>
             </li>
