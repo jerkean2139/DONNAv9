@@ -11,6 +11,7 @@ import { useMemo, useRef } from 'react';
 
 import { ControlPlaneClient } from './api/client';
 import { App } from './App';
+import { DonnaAvatar } from './components/DonnaAvatar';
 
 interface Props {
   publishableKey: string;
@@ -38,7 +39,7 @@ function SignedInApp({ jwtTemplate }: { jwtTemplate?: string }) {
     [jwtTemplate],
   );
 
-  return <App client={client} account={<UserButton />} />;
+  return <App client={client} authMode="clerk" account={<UserButton />} />;
 }
 
 /**
@@ -50,7 +51,7 @@ export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <ClerkLoading>
-        <div className="flex h-screen items-center justify-center bg-surface text-sm text-muted">
+        <div className="flex h-dvh items-center justify-center bg-surface text-sm text-muted">
           Loading sign-in…
         </div>
       </ClerkLoading>
@@ -58,7 +59,11 @@ export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
         <SignedInApp {...(jwtTemplate !== undefined ? { jwtTemplate } : {})} />
       </SignedIn>
       <SignedOut>
-        <div className="flex h-screen items-center justify-center bg-surface">
+        <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-4">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <DonnaAvatar size={72} />
+            <div className="text-xl font-semibold text-ink">Sign in to Donna</div>
+          </div>
           <SignIn />
         </div>
       </SignedOut>
