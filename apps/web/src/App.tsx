@@ -5,6 +5,7 @@ import { ClientsView } from './components/ClientsView';
 import { ClientView } from './components/ClientView';
 import { CommandBar, type CommandStatus } from './components/CommandBar';
 import { GlanceCard } from './components/GlanceCard';
+import { KitchenThread, type KitchenState } from './components/KitchenThread';
 import { MoreView } from './components/MoreView';
 import { ProjectsView } from './components/ProjectsView';
 import { ProjectView } from './components/ProjectView';
@@ -23,6 +24,8 @@ const HEALTH_POLL_MS = 30_000;
 const NOTICE_MS = 3_000;
 
 const PLAN_POLL_MS = 2_500;
+// How often an open kitchen thread re-reads the objective's activity.
+const KITCHEN_POLL_MS = 5_000;
 
 /** The user's local calendar date, YYYY-MM-DD (Donna plans relative to it). */
 function localToday(): string {
@@ -111,6 +114,9 @@ export function App({ client, authMode = 'dev', planner = false, gmail = false, 
   const [health, setHealth] = useState<ControlPlaneHealth>('checking');
   const [status, setStatus] = useState<CommandStatus>(() => takeGmailResult() ?? { kind: 'idle' });
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>();
+  // The objective whose kitchen thread is open (null: closed).
+  const [kitchenId, setKitchenId] = useState<string | null>(null);
+  const [kitchen, setKitchen] = useState<KitchenState>({ kind: 'loading' });
 
   const checkHealth = useCallback(async () => {
     try {
@@ -193,6 +199,29 @@ export function App({ client, authMode = 'dev', planner = false, gmail = false, 
     },
   };
 
+  // Keep the open kitchen thread fresh.
+  useEffect(() => {
+    if (kitchenId === null) return;
+    let cancelled = false;
+    setKitchen({ kind: 'loading' });
+    const load = () =>
+      client.listObjectiveEvents(kitchenId).then(
+        (events) => {
+          if (!cancelled) setKitchen({ kind: 'ready', events });
+        },
+        (error: unknown) => {
+          if (!cancelled) setKitchen({ kind: 'error', message: describeError(error) });
+        },
+      );
+    void load();
+    const timer = setInterval(() => void load(), KITCHEN_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [client, kitchenId]);
+  const kitchenObjective = objectives.find((o) => o.id === kitchenId) ?? null;
+
   // Confirmations fade on their own; errors stay until the next action.
   useEffect(() => {
     if (status.kind !== 'notice') return;
@@ -254,6 +283,8 @@ export function App({ client, authMode = 'dev', planner = false, gmail = false, 
           planner={planner}
           plans={planActions}
           onSuggest={(text) => setPrefill({ text, nonce: Date.now() })}
+          onOpenKitchen={(id) => setKitchenId((open) => (open === id ? null : id))}
+          kitchenId={kitchenId}
         />
       );
       break;
@@ -324,7 +355,15 @@ export function App({ client, authMode = 'dev', planner = false, gmail = false, 
             />
           )}
         </main>
-        {route.view === 'today' && <GlanceCard objectives={objectives} />}
+        {kitchenObjective !== null ? (
+          <KitchenThread
+            objective={kitchenObjective}
+            state={kitchen}
+            onClose={() => setKitchenId(null)}
+          />
+        ) : (
+          route.view === 'today' && <GlanceCard objectives={objectives} />
+        )}
       </div>
       <TabBar tabs={tabs} active={active} moreActive={moreActive} onSelect={selectSection} />
     </div>

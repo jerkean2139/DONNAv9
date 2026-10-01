@@ -105,4 +105,25 @@ describe('ControlPlaneClient', () => {
       code: 'missing_bearer_token',
     });
   });
+
+  it('listObjectiveEvents GETs the signed activity thread', async () => {
+    const events = [
+      { id: 'e1', type: 'objective.created', actor: { type: 'human', id: 'u1' }, createdAt: 'x' },
+    ];
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ events }),
+    });
+    const client = new ControlPlaneClient({
+      baseUrl: '',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      authHeaders: async () => ({ authorization: 'Bearer t0k' }),
+    });
+
+    expect(await client.listObjectiveEvents('o 1')).toEqual(events);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as FetchCall;
+    expect(url).toBe('/objectives/o%201/events');
+    expect((init?.headers as Record<string, string>)['authorization']).toBe('Bearer t0k');
+  });
 });

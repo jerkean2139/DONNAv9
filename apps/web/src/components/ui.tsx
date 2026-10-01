@@ -79,9 +79,17 @@ export function SectionHead({
   );
 }
 
+/**
+ * Reading width for a page column: a phone-friendly column that widens on
+ * laptops and desktops so the brief uses the screen.
+ */
+export const PAGE_WIDTH = 'max-w-2xl lg:max-w-4xl 2xl:max-w-5xl';
+
 export function Page({ children }: { children: ReactNode }) {
   return (
-    <div className="safe-x mx-auto w-full max-w-2xl pb-10 pt-4 md:px-10 md:pt-14">{children}</div>
+    <div className={`safe-x mx-auto w-full ${PAGE_WIDTH} pb-10 pt-4 md:px-10 md:pt-14`}>
+      {children}
+    </div>
   );
 }
 

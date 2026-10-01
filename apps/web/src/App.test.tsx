@@ -13,6 +13,7 @@ function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneCl
     health: vi.fn().mockResolvedValue({ status: 'ok' }),
     clientConfig: vi.fn().mockResolvedValue({ auth: 'dev' }),
     listObjectives: vi.fn().mockResolvedValue([]),
+    listObjectiveEvents: vi.fn().mockResolvedValue([]),
     createObjective: vi.fn(async ({ requestedOutcome }: { requestedOutcome: string }) => {
       seq += 1;
       const objective: ObjectiveView = { id: `o${seq}`, requestedOutcome, status: 'draft' };
@@ -322,5 +323,85 @@ describe('Gmail connection result', () => {
     render(<App client={fakeClient()} gmail />);
     expect(await screen.findByText(/allow “compose and send”/)).toBeInTheDocument();
     window.history.pushState(null, '', '/');
+  });
+});
+
+describe('Kitchen thread', () => {
+  const objective: ObjectiveView = {
+    id: 'o1',
+    requestedOutcome: 'Ship Route 40',
+    status: 'active',
+  };
+
+  it('opens the recorded work behind an objective, with Donna’s plan', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient({
+      listObjectives: vi.fn().mockResolvedValue([
+        {
+          ...objective,
+          plan: {
+            id: 'p1',
+            objectiveId: 'o1',
+            status: 'proposed',
+            plan: {
+              summary: 'Two steps to launch',
+              client: { kind: 'none' },
+              project: { kind: 'new', name: 'Route 40' },
+              sprint: null,
+              tasks: [
+                { title: 'A', subtasks: [], owner: 'you' },
+                { title: 'B', subtasks: [], owner: 'donna' },
+              ],
+              questions: [],
+            },
+            error: null,
+            projectId: null,
+          },
+        },
+      ]),
+      listObjectiveEvents: vi.fn().mockResolvedValue([
+        {
+          id: 'e1',
+          type: 'objective.created',
+          actor: { type: 'human', id: 'u1' },
+          createdAt: '2026-10-01T12:00:00.000Z',
+        },
+        {
+          id: 'e2',
+          type: 'task.completed',
+          actor: { type: 'adapter', id: 'anthropic' },
+          createdAt: '2026-10-01T12:01:00.000Z',
+          taskId: 'abcdef1234567890',
+        },
+      ]),
+    });
+    render(<App client={client} />);
+    await user.click(await screen.findByRole('button', { name: 'In the kitchen: Ship Route 40' }));
+
+    const thread = await screen.findByLabelText('Kitchen thread');
+    expect(client.listObjectiveEvents).toHaveBeenCalledWith('o1');
+    const messages = await within(thread).findByLabelText('Thread messages');
+    const items = within(messages).getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent('“Ship Route 40”');
+    expect(items[1]).toHaveTextContent('Proposed a plan with 2 tasks: Two steps to launch');
+    expect(items[2]).toHaveTextContent('Worker · anthropic');
+    expect(items[2]).toHaveTextContent('Finished the task.');
+    expect(items[2]).toHaveTextContent('task abcdef12');
+
+    await user.click(within(thread).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByLabelText('Kitchen thread')).not.toBeInTheDocument();
+  });
+
+  it('explains a thread the API refuses', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient({
+      listObjectives: vi.fn().mockResolvedValue([objective]),
+      listObjectiveEvents: vi.fn().mockRejectedValue(new ApiError(401, 'missing_bearer_token')),
+    });
+    render(<App client={client} />);
+    await user.click(await screen.findByRole('button', { name: 'In the kitchen: Ship Route 40' }));
+    const thread = await screen.findByLabelText('Kitchen thread');
+    expect(await within(thread).findByRole('alert')).toHaveTextContent('Not signed in');
   });
 });

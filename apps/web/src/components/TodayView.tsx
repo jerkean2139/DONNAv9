@@ -2,6 +2,7 @@ import type { AuthMode, ObjectiveView } from '../types';
 import { DonnaAvatar } from './DonnaAvatar';
 import { PlanCard } from './PlanCard';
 import { StatusChip } from './StatusChip';
+import { PAGE_WIDTH } from './ui';
 
 const SUGGESTIONS = [
   'Follow up with this week’s warm leads',
@@ -47,6 +48,10 @@ interface Props {
   /** Whether Donna can plan (a model is configured). */
   planner?: boolean;
   plans?: PlanActions;
+  /** Open an objective's kitchen thread (the work behind it). */
+  onOpenKitchen?: (objectiveId: string) => void;
+  /** The objective whose kitchen thread is open, if any. */
+  kitchenId?: string | null;
   now?: Date;
 }
 
@@ -57,13 +62,15 @@ export function TodayView({
   onSuggest,
   planner = false,
   plans,
+  onOpenKitchen,
+  kitchenId = null,
   now = new Date(),
 }: Props) {
   const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
   const date = now.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 
   return (
-    <div className="safe-x mx-auto w-full max-w-2xl pb-8 md:px-10">
+    <div className={`safe-x mx-auto w-full ${PAGE_WIDTH} pb-8 md:px-10`}>
       {/* Masthead */}
       <header className="pt-4 md:pt-14">
         <div className="flex items-center justify-between border-b border-edge pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
@@ -190,8 +197,21 @@ export function TodayView({
                 </span>
                 <div className="min-w-0">
                   <p className="text-[17px] leading-snug text-ink">{o.requestedOutcome}</p>
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
                     <StatusChip status={o.status} />
+                    {onOpenKitchen !== undefined && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenKitchen(o.id)}
+                        aria-pressed={kitchenId === o.id}
+                        aria-label={`In the kitchen: ${o.requestedOutcome}`}
+                        className={`font-mono text-[10px] uppercase tracking-[0.16em] transition-colors ${
+                          kitchenId === o.id ? 'text-accent' : 'text-faint hover:text-muted'
+                        }`}
+                      >
+                        In the kitchen →
+                      </button>
+                    )}
                   </div>
                   {plans !== undefined && (
                     <PlanCard

@@ -1,5 +1,8 @@
 import type {
   AuthorityLevel,
+  CorrelationId,
+  EventEnvelope,
+  EventId,
   ExecutionClass,
   Objective,
   ObjectiveId,
@@ -20,6 +23,7 @@ type ObjectiveRow = typeof schema.objectives.$inferSelect;
 type ObjectiveInsert = typeof schema.objectives.$inferInsert;
 type TaskRow = typeof schema.tasks.$inferSelect;
 type TaskInsert = typeof schema.tasks.$inferInsert;
+type EventRow = typeof schema.events.$inferSelect;
 
 /**
  * Map a domain {@link Objective} to an `objectives` insert row. The
@@ -71,6 +75,22 @@ export function rowToObjective(row: ObjectiveRow): Objective {
  * persisted column not carried on the minimal domain Task, so it is supplied
  * alongside (from the dispatch request); `organizationId` is the tenancy column.
  */
+/** Map an `events` row back to its domain {@link EventEnvelope}. */
+export function rowToEvent(row: EventRow): EventEnvelope {
+  return {
+    id: row.id as EventId,
+    type: row.type,
+    organizationId: row.organizationId as OrganizationId,
+    actor: { type: row.actorType, id: row.actorId },
+    correlationId: row.correlationId as CorrelationId,
+    createdAt: row.createdAt,
+    ...(row.objectiveId !== null ? { objectiveId: row.objectiveId as ObjectiveId } : {}),
+    ...(row.taskId !== null ? { taskId: row.taskId as TaskId } : {}),
+    ...(row.causationId !== null ? { causationId: row.causationId as EventId } : {}),
+    ...(row.payloadRef !== null ? { payloadRef: row.payloadRef } : {}),
+  };
+}
+
 export function taskToRow(
   task: Task,
   organizationId: string,
