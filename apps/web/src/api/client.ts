@@ -2,7 +2,9 @@ import type {
   AttachmentTarget,
   AttachmentView,
   ClientView,
+  GmailStatus,
   ObjectiveView,
+  OutboundEmailView,
   PlanRecordView,
   ProjectView,
   SprintView,
@@ -40,7 +42,19 @@ export type AuthConfig = (
 ) & {
   /** Whether Donna can plan and draft (a model is configured server-side). */
   planner?: boolean;
+  /** Whether Gmail can be connected (Google OAuth configured server-side). */
+  gmail?: boolean;
 };
+
+export interface EmailRequest {
+  to: string;
+  cc?: string;
+  subject: string;
+  body: string;
+  mode: 'draft' | 'send';
+  /** Required to send: the person's approval of this exact message. */
+  confirm?: boolean;
+}
 
 /** A non-2xx API response. `code` is the API's `error` field when present. */
 export class ApiError extends Error {
@@ -288,5 +302,30 @@ export class ControlPlaneClient {
   /** Ask Donna to write a task's deliverable. */
   draftTask(taskId: string): Promise<WorkItemView> {
     return this.request('POST', `/tasks/${encodeURIComponent(taskId)}/draft`, {});
+  }
+
+  // ── Gmail ────────────────────────────────────────────────────────────────
+
+  gmailStatus(): Promise<GmailStatus> {
+    return this.request('GET', '/integrations/google');
+  }
+
+  /** The Google consent URL to send the browser to. */
+  async connectGmail(): Promise<string> {
+    return (await this.request<{ url: string }>('POST', '/integrations/google/connect', {})).url;
+  }
+
+  disconnectGmail(): Promise<void> {
+    return this.request('DELETE', '/integrations/google');
+  }
+
+  async listEmails(taskId: string): Promise<OutboundEmailView[]> {
+    const path = `/tasks/${encodeURIComponent(taskId)}/emails`;
+    return (await this.request<{ emails: OutboundEmailView[] }>('GET', path)).emails;
+  }
+
+  /** Save to Gmail drafts, or (with `confirm`) send from the connected account. */
+  emailTask(taskId: string, email: EmailRequest): Promise<OutboundEmailView> {
+    return this.request('POST', `/tasks/${encodeURIComponent(taskId)}/email`, email);
   }
 }

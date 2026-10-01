@@ -16,11 +16,20 @@ import { DonnaAvatar } from './components/DonnaAvatar';
 interface Props {
   publishableKey: string;
   planner: boolean;
+  gmail: boolean;
   /** Clerk JWT template for API tokens, when the API expects one. */
   jwtTemplate?: string;
 }
 
-function SignedInApp({ jwtTemplate, planner }: { jwtTemplate?: string; planner: boolean }) {
+function SignedInApp({
+  jwtTemplate,
+  planner,
+  gmail,
+}: {
+  jwtTemplate?: string;
+  planner: boolean;
+  gmail: boolean;
+}) {
   const { getToken } = useAuth();
   // Keep the latest getToken without rebuilding the client (and refetching).
   const getTokenRef = useRef(getToken);
@@ -40,7 +49,15 @@ function SignedInApp({ jwtTemplate, planner }: { jwtTemplate?: string; planner: 
     [jwtTemplate],
   );
 
-  return <App client={client} authMode="clerk" planner={planner} account={<UserButton />} />;
+  return (
+    <App
+      client={client}
+      authMode="clerk"
+      planner={planner}
+      gmail={gmail}
+      account={<UserButton />}
+    />
+  );
 }
 
 /**
@@ -48,7 +65,7 @@ function SignedInApp({ jwtTemplate, planner }: { jwtTemplate?: string; planner: 
  * and resolves the principal from DONNA's own tables (Technical Plan §6/§8).
  * Loaded lazily so development builds never pull in Clerk.
  */
-export default function ClerkRoot({ publishableKey, jwtTemplate, planner }: Props) {
+export default function ClerkRoot({ publishableKey, jwtTemplate, planner, gmail }: Props) {
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <ClerkLoading>
@@ -57,7 +74,11 @@ export default function ClerkRoot({ publishableKey, jwtTemplate, planner }: Prop
         </div>
       </ClerkLoading>
       <SignedIn>
-        <SignedInApp planner={planner} {...(jwtTemplate !== undefined ? { jwtTemplate } : {})} />
+        <SignedInApp
+          planner={planner}
+          gmail={gmail}
+          {...(jwtTemplate !== undefined ? { jwtTemplate } : {})}
+        />
       </SignedIn>
       <SignedOut>
         <div className="grain ember-wash safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-4">

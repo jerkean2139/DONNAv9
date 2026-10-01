@@ -34,6 +34,9 @@ staff, not another dark-mode dashboard:
   Sheets, Slides, Dropbox, OneDrive, Notion, Figma, Loom, GitHub, any https URL)
   attachable at every level. Clients, Tasks and (under More) Projects are tabs;
   drilling down stays in the tab you started from.
+- **Email** (on each task, when the API has Gmail configured) — connect your
+  Gmail, then save Donna's draft to your Gmail drafts or send it from your
+  address after confirming the recipients. Connections live under More.
 - Sections without an API yet (Leads, People, Memory, Automations) show an
   honest "Not connected yet" state — no fabricated data.
 

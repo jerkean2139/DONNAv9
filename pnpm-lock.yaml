@@ -41,6 +41,9 @@ importers:
       '@donna/adapter-base':
         specifier: workspace:*
         version: link:../../packages/adapters/base
+      '@donna/adapter-gmail':
+        specifier: workspace:*
+        version: link:../../packages/adapters/gmail
       '@donna/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -185,6 +188,12 @@ importers:
       '@donna/adapter-http':
         specifier: workspace:*
         version: link:../http
+
+  packages/adapters/gmail:
+    dependencies:
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../base
 
   packages/adapters/http:
     dependencies:

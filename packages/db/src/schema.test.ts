@@ -2,6 +2,8 @@ import {
   ATTACHMENT_KINDS,
   CLIENT_STATUSES,
   DRAFT_STATUSES,
+  EMAIL_MODES,
+  EMAIL_STATUSES,
   EVENT_TYPES,
   EXECUTION_CLASSES,
   OBJECTIVE_STATUSES,
@@ -25,6 +27,8 @@ import {
   executionClassEnum,
   objectiveStatusEnum,
   planStatusEnum,
+  emailModeEnum,
+  emailStatusEnum,
   riskLevelEnum,
   roleEnum,
   scopeEnum,
@@ -40,8 +44,10 @@ import {
   delegations,
   events,
   featureFlags,
+  googleConnections,
   idempotencyKeys,
   memberships,
+  outboundEmails,
   objectives,
   organizations,
   projects,
@@ -77,6 +83,8 @@ describe('schema enums mirror core-domain', () => {
   it('work item owner', () => expect(workItemOwnerEnum.enumValues).toEqual([...WORK_ITEM_OWNERS]));
   it('draft status', () => expect(draftStatusEnum.enumValues).toEqual([...DRAFT_STATUSES]));
   it('plan status', () => expect(planStatusEnum.enumValues).toEqual([...PLAN_STATUSES]));
+  it('email mode', () => expect(emailModeEnum.enumValues).toEqual([...EMAIL_MODES]));
+  it('email status', () => expect(emailStatusEnum.enumValues).toEqual([...EMAIL_STATUSES]));
 });
 
 describe('control-plane tables are defined and org-scoped', () => {
@@ -93,6 +101,8 @@ describe('control-plane tables are defined and org-scoped', () => {
     delegations,
     auditEvents,
     idempotencyKeys,
+    googleConnections,
+    outboundEmails,
   ];
 
   it('every business-state table carries organization_id', () => {

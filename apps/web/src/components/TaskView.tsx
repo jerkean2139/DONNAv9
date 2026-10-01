@@ -5,6 +5,7 @@ import type { Navigate } from '../route';
 import type { WorkItemStatus, WorkItemView } from '../types';
 import { Attachments } from './Attachments';
 import { DonnaDraft } from './DonnaDraft';
+import { EmailTask } from './EmailTask';
 import {
   Check,
   Crumbs,
@@ -31,11 +32,14 @@ export function TaskView({
   id,
   navigate,
   planner = false,
+  gmail = false,
 }: {
   client: ControlPlaneClient;
   id: string;
   navigate: Navigate;
   planner?: boolean;
+  /** Whether Gmail can be connected on this deployment. */
+  gmail?: boolean;
 }) {
   const { data, error, setData } = useLoad(async () => {
     const detail = await client.getTask(id);
@@ -231,6 +235,8 @@ export function TaskView({
           onChange={(updated) => setData((d) => (d === null ? d : { ...d, task: updated }))}
         />
       )}
+
+      {task.parentId === null && gmail && <EmailTask client={client} task={task} />}
 
       <Attachments
         client={client}

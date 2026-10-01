@@ -286,6 +286,48 @@ test location first.
 
 ---
 
+## 5b. Gmail — `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DONNA_SECRET_KEY`
+
+**What:** lets each person connect their own Gmail so Donna can save a task's
+email to their Gmail drafts, or send it from their address after they confirm
+the exact recipients. Donna gets the `gmail.compose` permission only — she can
+write and send, but cannot read anyone's inbox. Without these variables the
+app works as before and the Email section simply doesn't appear.
+
+**Google Cloud (one time, ~10 minutes):**
+
+1. <https://console.cloud.google.com> → create (or pick) a project.
+2. **APIs & Services → Library** → enable **Gmail API**.
+3. **APIs & Services → OAuth consent screen** (Google Auth Platform → Branding /
+   Audience / Data access): app name "Donna", your support email. Under **Data
+   access** add the scope `.../auth/gmail.compose` (plus `openid` and `email`).
+   Under **Audience**, while it's just you, leave it in **Testing** and add your
+   Google address as a **test user**. (Testing-mode grants expire after 7 days —
+   you'll be asked to reconnect. Publishing the app for other users needs
+   Google's verification because `gmail.compose` is a restricted scope.)
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID** →
+   type **Web application**. Under **Authorized redirect URIs** add exactly:
+   `https://<your-railway-domain>/integrations/google/callback`
+5. Copy the **Client ID** and **Client secret**.
+
+**Railway → API (control-plane) service → Variables:**
+
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — from step 5.
+- `DONNA_SECRET_KEY` — 32 random bytes, base64. Generate one with
+  `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+  (or `openssl rand -base64 32`). It encrypts the stored Google refresh tokens;
+  changing it later just means everyone reconnects Gmail.
+- The callback URL is derived from Railway's public domain automatically. If
+  you use a custom domain, set `PUBLIC_URL=https://your.domain` (or the full
+  `GOOGLE_REDIRECT_URI`) so it matches what you registered in step 4.
+
+The startup log says `Gmail enabled (OAuth redirect: …)` when it's on. Then open
+a task → **Email** → **Connect Gmail**, or **More → Connections**.
+
+**Who can send:** owners, admins, executives and team leads can send; team
+members and contractors can only save to Gmail drafts. Every send is recorded
+(who, from, to, subject) in the audit log.
+
 ## 6. Railway service configuration
 
 DONNA runs as **two processes**, so you need **two Railway services** in the same
@@ -310,7 +352,8 @@ Then, in each service → **Variables**, set what that service needs:
 
 - **API (control-plane):** `DATABASE_URL`, `AUTH_JWKS_URL` (+ the other `AUTH_*`),
   `CLERK_WEBHOOK_SECRET`, `CLERK_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY` (Donna's
-  planning; optional `DONNA_MODEL`). Do **not** set `PORT` — Railway injects it and the app
+  planning; optional `DONNA_MODEL`), and for Gmail `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `DONNA_SECRET_KEY` (§5b). Do **not** set `PORT` — Railway injects it and the app
   reads it automatically.
 - **Worker:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GHL_TOKEN`
   (+ `GHL_LOCATION_ID` if used), and optionally `OPENAI_API_KEY` /
@@ -342,6 +385,11 @@ editor type `${{` and pick your Postgres service's `DATABASE_URL` (it becomes
 | `CLERK_WEBHOOK_SECRET`  | control-plane | required in prod                             | Clerk → Webhooks → Signing Secret             |
 | `CLERK_PUBLISHABLE_KEY` | control-plane | for the web app's sign-in in prod            | Clerk → API Keys → Publishable key            |
 | `CLERK_JWT_TEMPLATE`    | control-plane | optional                                     | Clerk JWT template name, if you use one       |
+| `GOOGLE_CLIENT_ID`      | control-plane | for Gmail                                    | Google Cloud → Credentials → OAuth client     |
+| `GOOGLE_CLIENT_SECRET`  | control-plane | for Gmail                                    | same OAuth client                             |
+| `DONNA_SECRET_KEY`      | control-plane | for Gmail (encrypts refresh tokens)          | 32 random bytes, base64                       |
+| `PUBLIC_URL`            | control-plane | optional (custom domain for OAuth callback)  | e.g. `https://donna.example.com`              |
+| `GOOGLE_REDIRECT_URI`   | control-plane | optional (overrides the callback URL)        | must match the OAuth client exactly           |
 | `GHL_TOKEN`             | worker        | for CRM                                      | GoHighLevel API                               |
 | `GHL_LOCATION_ID`       | worker        | optional                                     | GoHighLevel sub-account id                    |
 | `PORT`                  | control-plane | optional (default 3000)                      | you choose                                    |

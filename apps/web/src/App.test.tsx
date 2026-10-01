@@ -308,3 +308,19 @@ describe('App shell', () => {
     });
   });
 });
+
+describe('Gmail connection result', () => {
+  it('announces the OAuth result and clears it from the URL', async () => {
+    window.history.pushState(null, '', '/?gmail=connected');
+    render(<App client={fakeClient()} gmail />);
+    expect(await screen.findByText(/Gmail connected/)).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('explains a declined connection', async () => {
+    window.history.pushState(null, '', '/?gmail=scope');
+    render(<App client={fakeClient()} gmail />);
+    expect(await screen.findByText(/allow “compose and send”/)).toBeInTheDocument();
+    window.history.pushState(null, '', '/');
+  });
+});

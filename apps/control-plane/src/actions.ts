@@ -59,3 +59,29 @@ export const WORK_WRITE_ACTION: ActionDescriptor = {
   authorityLevel: AUTHORITY_LEVELS.PREPARE,
   sideEffecting: false,
 };
+
+/**
+ * Saving Donna's email to the person's own Gmail drafts. It writes to an
+ * external system but sends nothing — the person still presses Send in Gmail —
+ * so it is Prepare-level. It is side-effecting and outbound-comms, so the
+ * outbound kill switch pauses it too.
+ */
+export const EMAIL_DRAFT_ACTION: ActionDescriptor = {
+  name: 'email.draft',
+  authorityLevel: AUTHORITY_LEVELS.PREPARE,
+  sideEffecting: true,
+  capability: 'outbound_comms',
+};
+
+/**
+ * Sending email is client-facing comms: authority level 3, never without an
+ * explicit approval. The approval is the person's confirmation of the exact
+ * recipients, subject and body in the same request; it is recorded as an audit
+ * event alongside the outbound_emails row.
+ */
+export const EMAIL_SEND_ACTION: ActionDescriptor = {
+  name: 'email.send',
+  authorityLevel: AUTHORITY_LEVELS.APPROVAL_REQUIRED,
+  sideEffecting: true,
+  capability: 'outbound_comms',
+};
