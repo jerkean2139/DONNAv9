@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { ApiError, type ControlPlaneClient } from './api/client';
+import { ClientsView } from './components/ClientsView';
+import { ClientView } from './components/ClientView';
 import { CommandBar, type CommandStatus } from './components/CommandBar';
 import { GlanceCard } from './components/GlanceCard';
 import { MoreView } from './components/MoreView';
+import { ProjectsView } from './components/ProjectsView';
+import { ProjectView } from './components/ProjectView';
 import { SectionPlaceholder } from './components/SectionPlaceholder';
 import { Sidebar } from './components/Sidebar';
 import { TabBar } from './components/TabBar';
+import { TasksView } from './components/TasksView';
+import { TaskView } from './components/TaskView';
 import { TodayView } from './components/TodayView';
 import { TopBar } from './components/TopBar';
 import { PRIMARY_TABS, SECTIONS } from './data/sections';
+import { routeFor, type Route } from './route';
 import type { AuthMode, ControlPlaneHealth, ObjectiveView } from './types';
 
 const HEALTH_POLL_MS = 30_000;
@@ -37,7 +44,22 @@ function describeError(error: unknown): string {
 }
 
 export function App({ client, authMode = 'dev', account }: Props) {
-  const [active, setActive] = useState('today');
+  const [route, setRoute] = useState<Route>({ view: 'today' });
+  // The tab you're in. Drilling down (client → project → task) stays in the
+  // tab you started from, like an iOS navigation stack.
+  const [tab, setTab] = useState('today');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useCallback((next: Route) => {
+    setRoute(next);
+    if (scrollRef.current !== null) scrollRef.current.scrollTop = 0;
+  }, []);
+  const selectSection = useCallback(
+    (key: string) => {
+      setTab(key);
+      navigate(routeFor(key));
+    },
+    [navigate],
+  );
   const [objectives, setObjectives] = useState<ObjectiveView[]>([]);
   const [loading, setLoading] = useState(authMode !== 'unconfigured');
   const [health, setHealth] = useState<ControlPlaneHealth>('checking');
@@ -103,7 +125,6 @@ export function App({ client, authMode = 'dev', account }: Props) {
         return true;
       }
       setObjectives((prev) => [result.objective, ...prev]);
-      setActive('today');
       setStatus({ kind: 'notice', message: 'Got it — it’s on the agenda.' });
       return true;
     } catch (error) {
@@ -114,23 +135,50 @@ export function App({ client, authMode = 'dev', account }: Props) {
 
   const tabs = SECTIONS.filter((s) => PRIMARY_TABS.includes(s.key));
   const overflow = SECTIONS.filter((s) => !PRIMARY_TABS.includes(s.key));
-  const section = SECTIONS.find((s) => s.key === active);
+  const active = route.view === 'more' ? 'more' : tab;
   const moreActive = active === 'more' || overflow.some((s) => s.key === active);
 
   let view: ReactNode;
-  if (active === 'more') {
-    view = <MoreView sections={overflow} onSelect={setActive} />;
-  } else if (section === undefined || section.live === true) {
-    view = (
-      <TodayView
-        objectives={objectives}
-        loading={loading}
-        authMode={authMode}
-        onSuggest={(text) => setPrefill({ text, nonce: Date.now() })}
-      />
-    );
-  } else {
-    view = <SectionPlaceholder section={section} index={SECTIONS.indexOf(section)} />;
+  switch (route.view) {
+    case 'today':
+      view = (
+        <TodayView
+          objectives={objectives}
+          loading={loading}
+          authMode={authMode}
+          onSuggest={(text) => setPrefill({ text, nonce: Date.now() })}
+        />
+      );
+      break;
+    case 'clients':
+      view = <ClientsView client={client} navigate={navigate} />;
+      break;
+    case 'client':
+      view = <ClientView key={route.id} client={client} id={route.id} navigate={navigate} />;
+      break;
+    case 'projects':
+      view = <ProjectsView client={client} navigate={navigate} />;
+      break;
+    case 'project':
+      view = <ProjectView key={route.id} client={client} id={route.id} navigate={navigate} />;
+      break;
+    case 'tasks':
+      view = <TasksView client={client} navigate={navigate} />;
+      break;
+    case 'task':
+      view = <TaskView key={route.id} client={client} id={route.id} navigate={navigate} />;
+      break;
+    case 'more':
+      view = <MoreView sections={overflow} onSelect={selectSection} />;
+      break;
+    case 'section': {
+      const section = SECTIONS.find((s) => s.key === route.key);
+      view =
+        section === undefined ? null : (
+          <SectionPlaceholder section={section} index={SECTIONS.indexOf(section)} />
+        );
+      break;
+    }
   }
 
   return (
@@ -140,13 +188,16 @@ export function App({ client, authMode = 'dev', account }: Props) {
         <Sidebar
           sections={SECTIONS}
           active={active}
-          onSelect={setActive}
+          onSelect={selectSection}
           health={health}
           account={account}
         />
         <main className="relative z-10 flex min-w-0 flex-1 flex-col" aria-label="Workspace">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{view}</div>
-          {active !== 'more' && (
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {view}
+          </div>
+          {/* The composer speaks to Donna; it lives on the brief. */}
+          {route.view === 'today' && (
             <CommandBar
               onSubmit={handleCommand}
               status={status}
@@ -155,9 +206,9 @@ export function App({ client, authMode = 'dev', account }: Props) {
             />
           )}
         </main>
-        <GlanceCard objectives={objectives} />
+        {route.view === 'today' && <GlanceCard objectives={objectives} />}
       </div>
-      <TabBar tabs={tabs} active={active} moreActive={moreActive} onSelect={setActive} />
+      <TabBar tabs={tabs} active={active} moreActive={moreActive} onSelect={selectSection} />
     </div>
   );
 }

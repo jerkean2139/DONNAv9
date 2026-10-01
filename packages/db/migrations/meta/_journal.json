@@ -57,6 +57,13 @@
       "when": 1790227200000,
       "tag": "0007_business_constitution",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790811897014,
+      "tag": "0008_client_work_hierarchy",
+      "breakpoints": true
     }
   ]
 }

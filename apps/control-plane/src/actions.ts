@@ -37,3 +37,25 @@ export const TASK_DISPATCH_ACTION: ActionDescriptor = {
   authorityLevel: AUTHORITY_LEVELS.PREPARE,
   sideEffecting: false,
 };
+
+/**
+ * Reading the client work hierarchy (clients, projects, sprints, tasks,
+ * attachments). Observe-level; the gate that matters is the resource scope —
+ * a PROJECT-scoped project's sprints/tasks are member-only.
+ */
+export const WORK_READ_ACTION: ActionDescriptor = {
+  name: 'work.read',
+  authorityLevel: AUTHORITY_LEVELS.OBSERVE,
+  sideEffecting: false,
+};
+
+/**
+ * Creating or changing work-hierarchy records, including attaching files and
+ * links. Prepare-level, internal only: nothing leaves the system (attaching a
+ * Drive link stores the URL, it never calls Drive).
+ */
+export const WORK_WRITE_ACTION: ActionDescriptor = {
+  name: 'work.write',
+  authorityLevel: AUTHORITY_LEVELS.PREPARE,
+  sideEffecting: false,
+};

@@ -1,7 +1,7 @@
 import { relations } from 'drizzle-orm';
 import { foreignKey, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
-import { roleEnum, scopeEnum } from './enums.js';
+import { clientStatusEnum, roleEnum, scopeEnum } from './enums.js';
 
 /**
  * Tenancy & identity (Technical Plan §3.1, Build Bible V2-025).
@@ -106,6 +106,29 @@ export const memberships = pgTable(
   ],
 );
 
+/**
+ * A client of the organization — the top of the work hierarchy
+ * (Client → Project → Sprint → Task → Subtask; see work.ts).
+ */
+export const clients = pgTable(
+  'clients',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    status: clientStatusEnum('status').notNull().default('active'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('clients_org_idx').on(t.organizationId),
+    unique('clients_org_id_unique').on(t.organizationId, t.id),
+  ],
+);
+
 export const projects = pgTable(
   'projects',
   {
@@ -115,13 +138,22 @@ export const projects = pgTable(
       .references(() => organizations.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     scope: scopeEnum('scope').notNull().default('ORGANIZATION'),
+    // The client this project is for. Nullable: internal projects have none.
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index('projects_org_idx').on(t.organizationId),
+    index('projects_client_idx').on(t.organizationId, t.clientId),
     // Composite tenancy key (SEC-3b): FK target for `(organization_id, project_id)`.
     unique('projects_org_id_unique').on(t.organizationId, t.id),
+    // A project's client must belong to the project's own organization.
+    foreignKey({
+      columns: [t.organizationId, t.clientId],
+      foreignColumns: [clients.organizationId, clients.id],
+      name: 'projects_org_client_fk',
+    }),
   ],
 );
 

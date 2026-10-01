@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError, type ControlPlaneClient } from './api/client';
 import { App } from './App';
+import { fakeWork } from './test/fakeWork';
 import type { ObjectiveView } from './types';
 
 function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneClient {
@@ -17,6 +18,7 @@ function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneCl
       const objective: ObjectiveView = { id: `o${seq}`, requestedOutcome, status: 'draft' };
       return { status: 'created' as const, objective };
     }),
+    ...fakeWork(),
     ...overrides,
   } as unknown as ControlPlaneClient;
 }
@@ -115,5 +117,79 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument();
     const workspace = screen.getByLabelText('Workspace');
     expect(within(workspace).getByRole('button', { name: /Automations/ })).toBeInTheDocument();
+  });
+
+  it('walks client → project → sprint → task → subtask, with attachments', async () => {
+    const user = userEvent.setup();
+    render(<App client={fakeClient()} />);
+    await screen.findByText('The agenda is clear.');
+    const tabs = screen.getByLabelText('Tabs');
+
+    // Clients
+    await user.click(within(tabs).getByRole('button', { name: /Clients/ }));
+    expect(await screen.findByText(/No clients yet/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('New client name'), 'Acme Co{Enter}');
+    await user.click(await screen.findByRole('button', { name: /Acme Co/ }));
+
+    // Client → a Drive link on the client, then a project
+    expect(await screen.findByRole('heading', { name: 'Acme Co' })).toBeInTheDocument();
+    await user.type(
+      screen.getByLabelText('Paste a link'),
+      'https://drive.google.com/drive/folders/abc{Enter}',
+    );
+    expect(await screen.findByText('Drive')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('New project name'), 'Website{Enter}');
+    await user.click(await screen.findByRole('button', { name: /Website/ }));
+
+    // Project → a sprint and a task in it
+    expect(await screen.findByRole('heading', { name: 'Website' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '+ New sprint' }));
+    await user.type(screen.getByLabelText('Sprint name'), 'Sprint 1');
+    await user.click(screen.getByRole('button', { name: 'Create sprint' }));
+    await user.type(await screen.findByLabelText('New task in Sprint 1'), 'Homepage{Enter}');
+    const sprint = await screen.findByRole('region', { name: 'Sprint 1' });
+    await user.click(within(sprint).getByRole('button', { name: /Homepage/ }));
+
+    // Task → a subtask, an uploaded file, and a status change
+    expect(await screen.findByRole('heading', { name: 'Homepage' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('New subtask'), 'Hero copy{Enter}');
+    expect(await screen.findByText('Hero copy')).toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('Upload files'),
+      new File(['%PDF'], 'brief.pdf', { type: 'application/pdf' }),
+    );
+    expect(await screen.findByText('brief.pdf')).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'In progress' }));
+    expect(screen.getByRole('radio', { name: 'In progress' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    // Breadcrumb back to the project: the task shows its subtask progress
+    await user.click(
+      within(screen.getByLabelText('Breadcrumb')).getByRole('button', { name: 'Website' }),
+    );
+    expect(await screen.findByText('0/1 subtasks')).toBeInTheDocument();
+
+    // Tasks tab lists it as open work
+    await user.click(within(tabs).getByRole('button', { name: /Tasks/ }));
+    expect(await screen.findByRole('region', { name: 'Website' })).toBeInTheDocument();
+  });
+
+  it('checks off a task from the sprint list', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient();
+    const acme = await client.createClient('Acme');
+    const project = await client.createProject('Site', acme.id);
+    await client.createTask(project.id, { title: 'Ship it' });
+    render(<App client={client} />);
+    await screen.findByText('The agenda is clear.');
+    await user.click(
+      within(screen.getByLabelText('Sections')).getByRole('button', { name: /Projects/ }),
+    );
+    await user.click(await screen.findByRole('button', { name: /Site/ }));
+    const box = await screen.findByRole('checkbox', { name: 'Complete Ship it' });
+    await user.click(box);
+    expect(box).toHaveAttribute('aria-checked', 'true');
   });
 });

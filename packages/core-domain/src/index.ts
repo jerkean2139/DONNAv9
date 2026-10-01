@@ -15,3 +15,4 @@ export * from './objective.js';
 export * from './task.js';
 export * from './task-state-machine.js';
 export * from './compute-node.js';
+export * from './work.js';

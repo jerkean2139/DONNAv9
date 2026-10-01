@@ -1,4 +1,13 @@
-import type { ObjectiveView } from '../types';
+import type {
+  AttachmentTarget,
+  AttachmentView,
+  ClientView,
+  ObjectiveView,
+  ProjectView,
+  SprintView,
+  WorkItemStatus,
+  WorkItemView,
+} from '../types';
 
 // Typed client for the control-plane API. Same-origin by default (the
 // control-plane serves this app). Requests are signed by `authHeaders`: a Clerk
@@ -114,5 +123,135 @@ export class ControlPlaneClient {
       return { status: 'approval_required', reason: pending.reason ?? 'approval_required' };
     }
     return { status: 'created', objective: (await res.json()) as ObjectiveView };
+  }
+
+  // ── Client work hierarchy ────────────────────────────────────────────────
+
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(await this.signed()),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!res.ok) throw new ApiError(res.status, await errorCode(res));
+    return (res.status === 204 ? undefined : await res.json()) as T;
+  }
+
+  async listClients(): Promise<ClientView[]> {
+    return (await this.request<{ clients: ClientView[] }>('GET', '/clients')).clients;
+  }
+
+  createClient(name: string): Promise<ClientView> {
+    return this.request('POST', '/clients', { name });
+  }
+
+  getClient(
+    id: string,
+  ): Promise<{ client: ClientView; projects: ProjectView[]; attachments: AttachmentView[] }> {
+    return this.request('GET', `/clients/${encodeURIComponent(id)}`);
+  }
+
+  async listProjects(): Promise<ProjectView[]> {
+    return (await this.request<{ projects: ProjectView[] }>('GET', '/projects')).projects;
+  }
+
+  createProject(name: string, clientId: string | null): Promise<ProjectView> {
+    return this.request('POST', '/projects', { name, clientId });
+  }
+
+  getProject(id: string): Promise<{
+    project: ProjectView;
+    client: ClientView | null;
+    sprints: SprintView[];
+    tasks: WorkItemView[];
+    attachments: AttachmentView[];
+  }> {
+    return this.request('GET', `/projects/${encodeURIComponent(id)}`);
+  }
+
+  createSprint(
+    projectId: string,
+    input: { name: string; startsOn?: string; endsOn?: string },
+  ): Promise<SprintView> {
+    return this.request('POST', `/projects/${encodeURIComponent(projectId)}/sprints`, input);
+  }
+
+  createTask(
+    projectId: string,
+    input: { title: string; sprintId?: string | null; parentId?: string | null },
+  ): Promise<WorkItemView> {
+    return this.request('POST', `/projects/${encodeURIComponent(projectId)}/tasks`, input);
+  }
+
+  getTask(id: string): Promise<{
+    task: WorkItemView;
+    project: ProjectView;
+    subtasks: WorkItemView[];
+    attachments: AttachmentView[];
+  }> {
+    return this.request('GET', `/tasks/${encodeURIComponent(id)}`);
+  }
+
+  updateTask(
+    id: string,
+    patch: { title?: string; status?: WorkItemStatus; sprintId?: string | null },
+  ): Promise<WorkItemView> {
+    return this.request('PATCH', `/tasks/${encodeURIComponent(id)}`, patch);
+  }
+
+  deleteTask(id: string): Promise<void> {
+    return this.request('DELETE', `/tasks/${encodeURIComponent(id)}`);
+  }
+
+  listOpenTasks(): Promise<{ tasks: WorkItemView[]; projects: ProjectView[] }> {
+    return this.request('GET', '/tasks?open=true');
+  }
+
+  async listAttachments(target: AttachmentTarget): Promise<AttachmentView[]> {
+    const q = `targetType=${target.type}&targetId=${encodeURIComponent(target.id)}`;
+    return (await this.request<{ attachments: AttachmentView[] }>('GET', `/attachments?${q}`))
+      .attachments;
+  }
+
+  addLink(target: AttachmentTarget, url: string, title?: string): Promise<AttachmentView> {
+    return this.request('POST', '/attachments', {
+      targetType: target.type,
+      targetId: target.id,
+      url,
+      ...(title !== undefined && title !== '' ? { title } : {}),
+    });
+  }
+
+  async uploadFile(target: AttachmentTarget, file: File): Promise<AttachmentView> {
+    const q = `targetType=${target.type}&targetId=${encodeURIComponent(target.id)}&filename=${encodeURIComponent(file.name)}`;
+    const res = await this.fetchImpl(`${this.baseUrl}/attachments/upload?${q}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-attachment-type': file.type || 'application/octet-stream',
+        ...(await this.signed()),
+      },
+      body: file,
+    });
+    if (!res.ok)
+      throw new ApiError(res.status, res.status === 413 ? 'file_too_large' : await errorCode(res));
+    return (await res.json()) as AttachmentView;
+  }
+
+  /** Fetches a file attachment's bytes (requests are signed, so no plain href). */
+  async downloadAttachment(id: string): Promise<Blob> {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/attachments/${encodeURIComponent(id)}/content`,
+      { headers: await this.signed() },
+    );
+    if (!res.ok) throw new ApiError(res.status, await errorCode(res));
+    return res.blob();
+  }
+
+  deleteAttachment(id: string): Promise<void> {
+    return this.request('DELETE', `/attachments/${encodeURIComponent(id)}`);
   }
 }

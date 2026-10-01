@@ -27,6 +27,8 @@ import {
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
 import { SvixWebhookVerifier } from './webhooks/clerk-verify.js';
+import { DrizzleWorkService } from './work/drizzle-work-service.js';
+import { InMemoryWorkService } from './work/in-memory-work-service.js';
 import { DrizzleProvisioningService } from './webhooks/provisioning.js';
 
 /**
@@ -95,6 +97,7 @@ if (config.databaseUrl !== undefined) {
     objectiveService: new DrizzleObjectiveService(db),
     taskDispatcher: new DrizzleTaskDispatcher(db),
     authenticate: buildAuthenticator(config.auth, db),
+    work: new DrizzleWorkService(db),
     // In production the signing secret is required, so the provisioning webhook
     // is always wired; in development it is wired only when the secret is set.
     ...(config.webhookSecret !== undefined
@@ -120,6 +123,7 @@ if (config.databaseUrl !== undefined) {
     objectiveService: new InMemoryObjectiveService(bus),
     taskDispatcher,
     authenticate: buildAuthenticator(config.auth, undefined),
+    work: new InMemoryWorkService(),
   };
 }
 
