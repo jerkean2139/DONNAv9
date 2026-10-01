@@ -123,3 +123,7 @@ export const planStatusEnum = pgEnum('plan_status', [
   'dismissed',
   'failed',
 ]);
+
+export const emailModeEnum = pgEnum('email_mode', ['draft', 'send']);
+
+export const emailStatusEnum = pgEnum('email_status', ['pending', 'done', 'failed']);

@@ -12,6 +12,8 @@ import type { ProvisioningService } from './webhooks/provisioning.js';
 import type { ObjectiveService } from './services/objective-service.js';
 import type { TaskDispatcher } from './services/task-dispatcher.js';
 import type { PlanService } from './planning/plan-service.js';
+import { registerEmailRoutes } from './email/routes.js';
+import type { GmailService } from './email/gmail-service.js';
 import { registerPlanRoutes } from './planning/routes.js';
 import { registerWorkRoutes } from './work/routes.js';
 import type { WorkService } from './work/types.js';
@@ -58,6 +60,11 @@ export interface ServerDeps {
    * carry their plan and progress.
    */
   readonly planning?: PlanService;
+  /**
+   * Gmail: connect a Google account and save/send a task's email. Requires
+   * `work`. When present, its routes are registered.
+   */
+  readonly gmail?: GmailService;
 }
 
 export type ClientConfig =
@@ -166,12 +173,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         authenticate: deps.authenticate,
       });
     }
+    if (deps.gmail !== undefined) {
+      registerEmailRoutes(app, {
+        gmail: deps.gmail,
+        work: deps.work,
+        authenticate: deps.authenticate,
+      });
+    }
   }
 
   app.get('/client-config', async () => ({
     ...(deps.clientConfig ?? { auth: 'unconfigured' }),
     // Whether Donna can plan and draft (a model is configured).
     planner: deps.planning?.available ?? false,
+    // Whether Gmail can be connected (Google OAuth + encryption key configured).
+    gmail: deps.gmail?.configured ?? false,
   }));
 
   // The caller's recent objectives. Tenant-scoped in the query, then filtered by

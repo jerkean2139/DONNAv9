@@ -32,6 +32,7 @@ function shellFor(config: AuthConfig): ReactNode {
         <ClerkRoot
           publishableKey={config.clerkPublishableKey}
           planner={config.planner === true}
+          gmail={config.gmail === true}
           {...(config.clerkJwtTemplate !== undefined
             ? { jwtTemplate: config.clerkJwtTemplate }
             : {})}
@@ -49,6 +50,7 @@ function shellFor(config: AuthConfig): ReactNode {
         client={client}
         authMode="dev"
         planner={config.planner === true}
+        gmail={config.gmail === true}
         account={<DevBadge />}
       />
     );

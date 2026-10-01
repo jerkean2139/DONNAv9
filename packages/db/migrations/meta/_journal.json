@@ -71,6 +71,13 @@
       "when": 1790815274887,
       "tag": "0009_donna_plans_and_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790817208862,
+      "tag": "0010_gmail_connections_and_emails",
+      "breakpoints": true
     }
   ]
 }

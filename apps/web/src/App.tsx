@@ -37,6 +37,8 @@ interface Props {
   authMode?: AuthMode;
   /** Whether Donna can plan and draft (from /client-config). */
   planner?: boolean;
+  /** Whether Gmail can be connected (from /client-config). */
+  gmail?: boolean;
   /** The signed-in user's control (e.g. Clerk's UserButton or a dev badge). */
   account?: ReactNode;
 }
@@ -59,7 +61,35 @@ function describeError(error: unknown): string {
   return 'Could not reach the DONNA API.';
 }
 
-export function App({ client, authMode = 'dev', planner = false, account }: Props) {
+/** What the Google OAuth redirect (`?gmail=…`) means, for the notice line. */
+const GMAIL_RESULTS: Record<string, CommandStatus> = {
+  connected: { kind: 'notice', message: 'Gmail connected — I can draft and send from it now.' },
+  denied: { kind: 'error', message: 'Gmail wasn’t connected — Google access was declined.' },
+  scope: {
+    kind: 'error',
+    message: 'Gmail wasn’t connected — allow “compose and send” on the Google screen.',
+  },
+  expired: { kind: 'error', message: 'That Gmail link expired — try connecting again.' },
+  failed: { kind: 'error', message: 'Gmail couldn’t be connected — try again.' },
+  unconfigured: { kind: 'error', message: 'Gmail isn’t set up on this deployment.' },
+};
+
+/** Reads and clears the OAuth result from the URL, once, on load. */
+function takeGmailResult(): CommandStatus | null {
+  const params = new URLSearchParams(window.location.search);
+  const result = params.get('gmail');
+  if (result === null) return null;
+  params.delete('gmail');
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}${query !== '' ? `?${query}` : ''}${window.location.hash}`,
+  );
+  return GMAIL_RESULTS[result] ?? GMAIL_RESULTS['failed']!;
+}
+
+export function App({ client, authMode = 'dev', planner = false, gmail = false, account }: Props) {
   const [route, setRoute] = useState<Route>({ view: 'today' });
   // The tab you're in. Drilling down (client → project → task) stays in the
   // tab you started from, like an iOS navigation stack.
@@ -79,7 +109,7 @@ export function App({ client, authMode = 'dev', planner = false, account }: Prop
   const [objectives, setObjectives] = useState<ObjectiveView[]>([]);
   const [loading, setLoading] = useState(authMode !== 'unconfigured');
   const [health, setHealth] = useState<ControlPlaneHealth>('checking');
-  const [status, setStatus] = useState<CommandStatus>({ kind: 'idle' });
+  const [status, setStatus] = useState<CommandStatus>(() => takeGmailResult() ?? { kind: 'idle' });
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>();
 
   const checkHealth = useCallback(async () => {
@@ -250,11 +280,14 @@ export function App({ client, authMode = 'dev', planner = false, account }: Prop
           id={route.id}
           navigate={navigate}
           planner={planner}
+          gmail={gmail}
         />
       );
       break;
     case 'more':
-      view = <MoreView sections={overflow} onSelect={selectSection} />;
+      view = (
+        <MoreView sections={overflow} onSelect={selectSection} client={client} gmail={gmail} />
+      );
       break;
     case 'section': {
       const section = SECTIONS.find((s) => s.key === route.key);

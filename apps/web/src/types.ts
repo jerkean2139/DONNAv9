@@ -119,3 +119,27 @@ export interface AttachmentTarget {
   type: AttachmentTargetType;
   id: string;
 }
+
+/** The signed-in person's Gmail connection. */
+export interface GmailStatus {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+}
+
+/** An email saved to Gmail drafts or sent for a task. */
+export interface OutboundEmailView {
+  id: string;
+  workItemId: string;
+  fromEmail: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  body: string;
+  mode: 'draft' | 'send';
+  status: 'pending' | 'done' | 'failed';
+  error: string | null;
+  gmailDraftId: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}

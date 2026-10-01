@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { AnthropicModelAdapter } from '@donna/adapter-anthropic';
+import { GoogleOAuth } from '@donna/adapter-gmail';
 import { MODEL_REGISTRY } from '@donna/config';
 import { createDatabase, runDrizzleMigrations, type DonnaDatabase } from '@donna/db';
 import { InMemoryEventBus } from '@donna/events';
@@ -29,6 +30,16 @@ import {
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
 import { SvixWebhookVerifier } from './webhooks/clerk-verify.js';
+import { GmailService } from './email/gmail-service.js';
+import { SecretBox } from './email/secret-box.js';
+import {
+  DrizzleConnectionStore,
+  DrizzleEmailStore,
+  InMemoryConnectionStore,
+  InMemoryEmailStore,
+  type ConnectionStore,
+  type EmailStore,
+} from './email/stores.js';
 import { Background } from './planning/background.js';
 import { AdapterDonnaModel, type DonnaModel } from './planning/donna-model.js';
 import { PlanService } from './planning/plan-service.js';
@@ -110,7 +121,49 @@ function buildDonnaModel(): DonnaModel | undefined {
   return new AdapterDonnaModel(new AnthropicModelAdapter({ model: entry }), entry.id);
 }
 
-let deps: ServerDeps & { work: WorkService; planStore: PlanStore };
+/**
+ * Gmail, when the deployment has Google OAuth credentials and an encryption
+ * key for refresh tokens. The callback URL is `GOOGLE_REDIRECT_URI`, else
+ * derived from `PUBLIC_URL` or Railway's public domain; it must match the
+ * redirect URI registered on the Google OAuth client exactly.
+ */
+function buildGmail(connections: ConnectionStore, emails: EmailStore): GmailService {
+  const clientId = process.env['GOOGLE_CLIENT_ID'];
+  const clientSecret = process.env['GOOGLE_CLIENT_SECRET'];
+  if (!clientId || !clientSecret) {
+    console.warn('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — Gmail is not available.');
+    return new GmailService({ connections, emails });
+  }
+  const box = SecretBox.fromEnv(process.env['DONNA_SECRET_KEY']);
+  if (box === null) {
+    console.warn('DONNA_SECRET_KEY missing or not 32 bytes (base64) — Gmail is not available.');
+    return new GmailService({ connections, emails });
+  }
+  const publicUrl =
+    process.env['PUBLIC_URL'] ||
+    (process.env['RAILWAY_PUBLIC_DOMAIN'] ? `https://${process.env['RAILWAY_PUBLIC_DOMAIN']}` : '');
+  const redirectUri =
+    process.env['GOOGLE_REDIRECT_URI'] ||
+    (publicUrl ? `${publicUrl.replace(/\/$/, '')}/integrations/google/callback` : '');
+  if (redirectUri === '') {
+    console.warn('No GOOGLE_REDIRECT_URI or PUBLIC_URL — Gmail is not available.');
+    return new GmailService({ connections, emails });
+  }
+  console.log(`Gmail enabled (OAuth redirect: ${redirectUri}).`);
+  return new GmailService({
+    connections,
+    emails,
+    box,
+    oauth: new GoogleOAuth({ clientId, clientSecret, redirectUri }),
+  });
+}
+
+let deps: ServerDeps & {
+  work: WorkService;
+  planStore: PlanStore;
+  connectionStore: ConnectionStore;
+  emailStore: EmailStore;
+};
 // The dev-shim identity the web app uses (outside production only).
 let devPrincipal: DevPrincipal | undefined;
 if (config.databaseUrl !== undefined) {
@@ -128,6 +181,8 @@ if (config.databaseUrl !== undefined) {
     authenticate: buildAuthenticator(config.auth, db),
     work: new DrizzleWorkService(db),
     planStore: new DrizzlePlanStore(db),
+    connectionStore: new DrizzleConnectionStore(db),
+    emailStore: new DrizzleEmailStore(db),
     // In production the signing secret is required, so the provisioning webhook
     // is always wired; in development it is wired only when the secret is set.
     ...(config.webhookSecret !== undefined
@@ -155,6 +210,8 @@ if (config.databaseUrl !== undefined) {
     authenticate: buildAuthenticator(config.auth, undefined),
     work: new InMemoryWorkService(),
     planStore: new InMemoryPlanStore(),
+    connectionStore: new InMemoryConnectionStore(),
+    emailStore: new InMemoryEmailStore(),
   };
 }
 
@@ -210,7 +267,7 @@ const planning = new PlanService({
     return model !== undefined ? { model } : {};
   })(),
 });
-deps = { ...deps, planning };
+deps = { ...deps, planning, gmail: buildGmail(deps.connectionStore, deps.emailStore) };
 
 const app = buildServer(deps);
 
