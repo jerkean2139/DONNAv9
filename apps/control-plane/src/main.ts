@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { AnthropicModelAdapter } from '@donna/adapter-anthropic';
+import { MODEL_REGISTRY } from '@donna/config';
 import { createDatabase, runDrizzleMigrations, type DonnaDatabase } from '@donna/db';
 import { InMemoryEventBus } from '@donna/events';
 import { runMigrations } from 'graphile-worker';
@@ -27,8 +29,13 @@ import {
 import { InMemoryTaskService } from './services/task-service.js';
 import { InMemoryWorkQueue } from './services/work-queue.js';
 import { SvixWebhookVerifier } from './webhooks/clerk-verify.js';
+import { Background } from './planning/background.js';
+import { AdapterDonnaModel, type DonnaModel } from './planning/donna-model.js';
+import { PlanService } from './planning/plan-service.js';
+import { DrizzlePlanStore, InMemoryPlanStore, type PlanStore } from './planning/plan-store.js';
 import { DrizzleWorkService } from './work/drizzle-work-service.js';
 import { InMemoryWorkService } from './work/in-memory-work-service.js';
+import type { WorkService } from './work/types.js';
 import { DrizzleProvisioningService } from './webhooks/provisioning.js';
 
 /**
@@ -81,7 +88,29 @@ if (!resolution.ok) {
 }
 const config = resolution.config;
 
-let deps: ServerDeps;
+/**
+ * Donna's model for planning and drafting. Only built when an Anthropic key is
+ * configured; without one, the planning routes answer `planner_unconfigured`
+ * and the app says so. `DONNA_MODEL` overrides the default model id.
+ */
+function buildDonnaModel(): DonnaModel | undefined {
+  const key = process.env['ANTHROPIC_API_KEY'];
+  if (key === undefined || key === '') {
+    console.warn('ANTHROPIC_API_KEY not set — Donna cannot plan or draft yet.');
+    return undefined;
+  }
+  const modelId = process.env['DONNA_MODEL'] || 'claude-opus-5-5';
+  const entry = MODEL_REGISTRY.find((m) => m.id === modelId && m.provider === 'anthropic');
+  if (entry === undefined) {
+    console.warn(
+      `DONNA_MODEL "${modelId}" is not an Anthropic model in the registry — planning disabled.`,
+    );
+    return undefined;
+  }
+  return new AdapterDonnaModel(new AnthropicModelAdapter({ model: entry }), entry.id);
+}
+
+let deps: ServerDeps & { work: WorkService; planStore: PlanStore };
 // The dev-shim identity the web app uses (outside production only).
 let devPrincipal: DevPrincipal | undefined;
 if (config.databaseUrl !== undefined) {
@@ -98,6 +127,7 @@ if (config.databaseUrl !== undefined) {
     taskDispatcher: new DrizzleTaskDispatcher(db),
     authenticate: buildAuthenticator(config.auth, db),
     work: new DrizzleWorkService(db),
+    planStore: new DrizzlePlanStore(db),
     // In production the signing secret is required, so the provisioning webhook
     // is always wired; in development it is wired only when the secret is set.
     ...(config.webhookSecret !== undefined
@@ -124,6 +154,7 @@ if (config.databaseUrl !== undefined) {
     taskDispatcher,
     authenticate: buildAuthenticator(config.auth, undefined),
     work: new InMemoryWorkService(),
+    planStore: new InMemoryPlanStore(),
   };
 }
 
@@ -168,6 +199,18 @@ if (webRoot !== undefined) {
     `Web bundle not found (looked in: ${webCandidates.join(', ')}) — serving the API only.`,
   );
 }
+
+const planning = new PlanService({
+  work: deps.work,
+  objectives: deps.objectiveService,
+  plans: deps.planStore,
+  background: new Background(),
+  ...(() => {
+    const model = buildDonnaModel();
+    return model !== undefined ? { model } : {};
+  })(),
+});
+deps = { ...deps, planning };
 
 const app = buildServer(deps);
 

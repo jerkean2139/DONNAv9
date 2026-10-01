@@ -65,3 +65,18 @@ export function detectLinkProvider(raw: string): LinkProvider | null {
   if (is('github.com')) return 'github';
   return 'web';
 }
+
+/** Who does a task: you (or your team), or Donna herself. */
+export const WORK_ITEM_OWNERS = ['you', 'donna'] as const;
+export type WorkItemOwner = (typeof WORK_ITEM_OWNERS)[number];
+
+/** Lifecycle of the draft Donna writes for a task she owns. */
+export const DRAFT_STATUSES = ['none', 'drafting', 'ready', 'failed'] as const;
+export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+
+/**
+ * Lifecycle of Donna's plan for an objective: she drafts it, you review it,
+ * and only on approval does it become clients, projects, sprints and tasks.
+ */
+export const PLAN_STATUSES = ['drafting', 'proposed', 'approved', 'dismissed', 'failed'] as const;
+export type PlanStatus = (typeof PLAN_STATUSES)[number];

@@ -1,8 +1,9 @@
 import type { AttachmentTarget, LinkProvider } from '@donna/core-domain';
 import { schema, type DonnaDatabase } from '@donna/db';
-import { and, asc, count, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 
 import {
+  effectiveDraft,
   cleanContentType,
   cleanFilename,
   linkTitle,
@@ -23,6 +24,8 @@ import {
   type CreateProjectInput,
   type CreateSprintInput,
   type CreateWorkItemInput,
+  type DraftUpdate,
+  type ObjectiveProgress,
   type ProjectView,
   type SprintView,
   type UpdateClientInput,
@@ -67,6 +70,10 @@ const toWorkItem = (r: WorkItemRow): WorkItemView => ({
   dueOn: r.dueOn,
   position: r.position,
   createdAt: r.createdAt.toISOString(),
+  objectiveId: r.objectiveId,
+  owner: r.owner,
+  draft: r.draft,
+  ...effectiveDraft(r.draftStatus, r.draftError, r.draftUpdatedAt),
 });
 
 function targetOf(r: AttachmentRow): AttachmentRef {
@@ -340,6 +347,8 @@ export class DrizzleWorkService implements WorkService {
         title,
         dueOn,
         createdBy,
+        objectiveId: input.objectiveId ?? null,
+        owner: input.owner ?? 'you',
         // Append after the last sibling (same project, same parent).
         position: sql`(
           select coalesce(max(${workItems.position}) + 1, 0) from ${workItems}
@@ -393,6 +402,45 @@ export class DrizzleWorkService implements WorkService {
       }
       return updated === undefined ? null : toWorkItem(updated);
     });
+  }
+
+  async setDraft(org: string, id: string, update: DraftUpdate): Promise<WorkItemView | null> {
+    const [row] = await this.db
+      .update(workItems)
+      .set({
+        draftStatus: update.status,
+        ...(update.status === 'ready' ? { draft: update.draft } : {}),
+        draftError: update.status === 'failed' ? update.error : null,
+        draftUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(workItems.id, id), eq(workItems.organizationId, org)))
+      .returning();
+    return row === undefined ? null : toWorkItem(row);
+  }
+
+  async progressByObjective(
+    org: string,
+    objectiveIds: readonly string[],
+  ): Promise<Record<string, ObjectiveProgress>> {
+    if (objectiveIds.length === 0) return {};
+    const rows = await this.db
+      .select({
+        objectiveId: workItems.objectiveId,
+        total: count(),
+        done: sql<number>`count(*) filter (where ${workItems.status} = 'done')`,
+      })
+      .from(workItems)
+      .where(
+        and(eq(workItems.organizationId, org), inArray(workItems.objectiveId, [...objectiveIds])),
+      )
+      .groupBy(workItems.objectiveId);
+    const out: Record<string, ObjectiveProgress> = {};
+    for (const r of rows) {
+      if (r.objectiveId !== null)
+        out[r.objectiveId] = { done: Number(r.done), total: Number(r.total) };
+    }
+    return out;
   }
 
   async deleteWorkItem(org: string, id: string): Promise<boolean> {

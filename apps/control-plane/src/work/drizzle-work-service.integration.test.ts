@@ -37,7 +37,27 @@ describeWorkServiceContract(
   async () => {
     const a = await seedOrg();
     const b = await seedOrg();
-    return { work: new DrizzleWorkService(db), org: a.org, userId: a.userId, otherOrg: b.org };
+    const makeObjective = async () => {
+      const [row] = await db
+        .insert(schema.objectives)
+        .values({
+          organizationId: a.org,
+          scope: 'ORGANIZATION',
+          requesterId: a.userId,
+          ownerId: a.userId,
+          requestedOutcome: 'Launch',
+          definitionOfDone: 'Launched',
+        })
+        .returning({ id: schema.objectives.id });
+      return row!.id;
+    };
+    return {
+      work: new DrizzleWorkService(db),
+      org: a.org,
+      userId: a.userId,
+      otherOrg: b.org,
+      makeObjective,
+    };
   },
   Boolean(TEST_DATABASE_URL),
 );

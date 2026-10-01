@@ -9,6 +9,36 @@ export interface ObjectiveView {
   id: string;
   requestedOutcome: string;
   status: ObjectiveStatus;
+  projectId?: string;
+  /** Donna's plan for it, when planning is on (from GET /objectives). */
+  plan?: PlanRecordView | null;
+  /** Tasks done / total among the tasks planned from it. */
+  progress?: { done: number; total: number } | null;
+}
+
+// ── Donna's plans (mirrors control-plane planning/plan.ts + plan-store.ts) ───
+
+export type PlanStatus = 'drafting' | 'proposed' | 'approved' | 'dismissed' | 'failed';
+
+export interface PlanView {
+  summary: string;
+  client:
+    | { kind: 'existing'; id: string; name: string }
+    | { kind: 'new'; name: string }
+    | { kind: 'none' };
+  project: { kind: 'existing'; id: string; name: string } | { kind: 'new'; name: string };
+  sprint: { name: string; startsOn: string | null; endsOn: string | null } | null;
+  tasks: { title: string; subtasks: string[]; owner: 'you' | 'donna' }[];
+  questions: string[];
+}
+
+export interface PlanRecordView {
+  id: string;
+  objectiveId: string;
+  status: PlanStatus;
+  plan: PlanView | null;
+  error: string | null;
+  projectId: string | null;
 }
 
 export type ControlPlaneHealth = 'ok' | 'checking' | 'degraded' | 'down';
@@ -66,6 +96,11 @@ export interface WorkItemView {
   status: WorkItemStatus;
   dueOn: string | null;
   position: number;
+  objectiveId?: string | null;
+  owner?: 'you' | 'donna';
+  draft?: string | null;
+  draftStatus?: 'none' | 'drafting' | 'ready' | 'failed';
+  draftError?: string | null;
 }
 
 export interface AttachmentView {

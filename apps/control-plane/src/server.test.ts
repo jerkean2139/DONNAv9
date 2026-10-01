@@ -418,7 +418,7 @@ describe('GET /client-config', () => {
   it('reports unconfigured auth by default', async () => {
     const { app } = makeApp();
     const res = await app.inject({ method: 'GET', url: '/client-config' });
-    expect(res.json()).toEqual({ auth: 'unconfigured' });
+    expect(res.json()).toEqual({ auth: 'unconfigured', planner: false });
   });
 
   it('serves the configured public auth settings without authentication', async () => {
@@ -434,6 +434,10 @@ describe('GET /client-config', () => {
     });
     const res = await app.inject({ method: 'GET', url: '/client-config' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ auth: 'clerk', clerkPublishableKey: 'pk_test_123' });
+    expect(res.json()).toEqual({
+      auth: 'clerk',
+      clerkPublishableKey: 'pk_test_123',
+      planner: false,
+    });
   });
 });

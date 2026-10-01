@@ -89,6 +89,13 @@ orders can't execute (they resolve to no adapter).
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
+**Donna's planning (command bar):** set `ANTHROPIC_API_KEY` on the **API
+(control-plane)** service too. With it, typing an outcome makes Donna plan it
+into client → project → sprint → tasks for your approval, then draft the tasks
+she owns. Without it the command bar still records the objective, and Today
+shows a note that planning is off. `DONNA_MODEL` (optional, API service)
+overrides the model Donna plans and drafts with — default `claude-opus-5-5`.
+
 Anthropic is the primary provider and the only one required for AI work. OpenAI
 (§2a) and a local model (§2b) are **optional** additional providers — the Model
 Router uses them for fallback and privacy-constrained routing. Any provider you
@@ -302,7 +309,8 @@ right config Railway's autodetect fails on this monorepo
 Then, in each service → **Variables**, set what that service needs:
 
 - **API (control-plane):** `DATABASE_URL`, `AUTH_JWKS_URL` (+ the other `AUTH_*`),
-  `CLERK_WEBHOOK_SECRET`, `CLERK_PUBLISHABLE_KEY`. Do **not** set `PORT` — Railway injects it and the app
+  `CLERK_WEBHOOK_SECRET`, `CLERK_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY` (Donna's
+  planning; optional `DONNA_MODEL`). Do **not** set `PORT` — Railway injects it and the app
   reads it automatically.
 - **Worker:** `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GHL_TOKEN`
   (+ `GHL_LOCATION_ID` if used), and optionally `OPENAI_API_KEY` /
@@ -319,7 +327,8 @@ editor type `${{` and pick your Postgres service's `DATABASE_URL` (it becomes
 | Variable                | Service       | Required                                     | Source                                        |
 | ----------------------- | ------------- | -------------------------------------------- | --------------------------------------------- |
 | `DATABASE_URL`          | both          | for durability                               | Railway Postgres                              |
-| `ANTHROPIC_API_KEY`     | worker        | for AI                                       | console.anthropic.com                         |
+| `ANTHROPIC_API_KEY`     | both          | for AI (API: Donna's planning)               | console.anthropic.com                         |
+| `DONNA_MODEL`           | control-plane | optional (default `claude-opus-5-5`)         | a Claude model id                             |
 | `OPENAI_API_KEY`        | worker        | optional (OpenAI)                            | platform.openai.com/api-keys                  |
 | `OPENAI_BASE_URL`       | worker        | optional                                     | OpenAI-compatible proxy URL                   |
 | `LOCAL_MODEL_BASE_URL`  | worker        | optional (local model)                       | your local server, e.g. Ollama `/v1`          |

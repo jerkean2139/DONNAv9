@@ -35,6 +35,15 @@ importers:
 
   apps/control-plane:
     dependencies:
+      '@donna/adapter-anthropic':
+        specifier: workspace:*
+        version: link:../../packages/adapters/model-anthropic
+      '@donna/adapter-base':
+        specifier: workspace:*
+        version: link:../../packages/adapters/base
+      '@donna/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@donna/core-domain':
         specifier: workspace:*
         version: link:../../packages/core-domain

@@ -36,6 +36,11 @@ export interface ObjectiveService {
    * `get`; the caller still applies the per-objective scope policy.
    */
   list(organizationId: string, limit: number): Promise<Objective[]>;
+  /**
+   * Mark the objective active and attach it to the project its approved plan
+   * landed in. Tenant-scoped; returns null for another tenant's objective.
+   */
+  activate(id: string, organizationId: string, projectId: string): Promise<Objective | null>;
 }
 
 /**
@@ -96,5 +101,17 @@ export class InMemoryObjectiveService implements ObjectiveService {
       .map((entry) => entry.objective)
       .reverse()
       .slice(0, limit);
+  }
+
+  async activate(id: string, organizationId: string, projectId: string): Promise<Objective | null> {
+    const entry = this.store.get(id);
+    if (entry === undefined || entry.organizationId !== organizationId) return null;
+    const objective: Objective = {
+      ...entry.objective,
+      status: 'active',
+      projectId: projectId as ProjectId,
+    };
+    this.store.set(id, { objective, organizationId });
+    return objective;
   }
 }

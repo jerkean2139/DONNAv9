@@ -26,7 +26,23 @@ export interface AnthropicAdapterOptions {
   /** Enable adaptive thinking + effort (default: the model's reasoning capability). */
   readonly enableThinking?: boolean;
   readonly defaultMaxOutputTokens?: number;
+  /**
+   * Opt into the server-side refusal fallback: if the model's safety
+   * classifiers decline a request, the API re-runs it on Anthropic's
+   * recommended fallback model inside the same call (`fallbacks: "default"`).
+   * Defaults to on for the models that support it.
+   */
+  readonly refusalFallback?: boolean;
 }
+
+/** Models that accept the `fallbacks: "default"` server-side refusal fallback. */
+const FALLBACK_MODELS = new Set([
+  'claude-fable-5-1',
+  'claude-opus-5-5',
+  'claude-opus-5',
+  'claude-sonnet-5-5',
+]);
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
 /** Map a 0-10 reasoning tier to an Anthropic effort level (Technical Plan §10). */
 export function effortForTier(tier: number): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
@@ -57,6 +73,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
   private readonly client: AnthropicMessagesClient;
   private readonly enableThinking: boolean;
   private readonly defaultMaxOutputTokens: number;
+  private readonly refusalFallback: boolean;
   private lastUsage: UsageRecord | undefined;
 
   constructor(options: AnthropicAdapterOptions) {
@@ -66,6 +83,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
     this.client = options.client ?? (new Anthropic() as unknown as AnthropicMessagesClient);
     this.enableThinking = options.enableThinking ?? options.model.capabilities.reasoning;
     this.defaultMaxOutputTokens = options.defaultMaxOutputTokens ?? 16000;
+    this.refusalFallback = options.refusalFallback ?? FALLBACK_MODELS.has(options.model.id);
   }
 
   capabilities(): CapabilitySpec {
@@ -119,16 +137,27 @@ export class AnthropicModelAdapter implements ModelAdapter {
       messages,
     };
     if (system !== '') params.system = system;
+    const outputConfig: Record<string, unknown> = {};
     if (this.enableThinking) {
       params.thinking = { type: 'adaptive' };
-      params.output_config = { effort: effortForTier(input.reasoningTier ?? 5) };
+      outputConfig.effort = effortForTier(input.reasoningTier ?? 5);
     }
+    // Structured output: constrained decoding to the caller's JSON Schema.
+    if (input.responseSchema !== undefined) {
+      outputConfig.format = { type: 'json_schema', schema: input.responseSchema };
+    }
+    if (Object.keys(outputConfig).length > 0) params.output_config = outputConfig;
     return params;
   }
 
   async execute(input: ModelRequest): Promise<ModelResult> {
     const start = Date.now();
-    const res = await this.client.messages.create(this.buildParams(input));
+    const params = this.buildParams(input);
+    const beta = this.client.beta;
+    const res =
+      this.refusalFallback && beta !== undefined
+        ? await beta.messages.create({ ...params, betas: [FALLBACK_BETA], fallbacks: 'default' })
+        : await this.client.messages.create(params);
     const latencyMs = Date.now() - start;
 
     const text = res.content

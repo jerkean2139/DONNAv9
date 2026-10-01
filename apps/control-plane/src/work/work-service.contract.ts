@@ -8,6 +8,8 @@ export interface ContractFixture {
   readonly org: string;
   readonly userId: string;
   readonly otherOrg: string;
+  /** Create an objective in `org` and return its id (for objective links). */
+  readonly makeObjective: () => Promise<string>;
 }
 
 async function rejects(p: Promise<unknown>, code: string): Promise<void> {
@@ -240,6 +242,51 @@ export function describeWorkServiceContract(
       );
       expect(await f.work.deleteWorkItem(f.otherOrg, task.id)).toBe(false);
       expect(await f.work.getWorkItem(f.org, task.id)).not.toBeNull();
+    });
+
+    it('tracks Donna-owned tasks, their drafts, and objective progress', async () => {
+      const f = await setup();
+      const { project } = await tree(f);
+      const objectiveId = await f.makeObjective();
+      const mine = await f.work.createWorkItem(
+        f.org,
+        { projectId: project.id, title: 'Draft the launch email', objectiveId, owner: 'donna' },
+        f.userId,
+      );
+      expect(mine).toMatchObject({ owner: 'donna', objectiveId, draftStatus: 'none', draft: null });
+      await f.work.createWorkItem(
+        f.org,
+        { projectId: project.id, title: 'Call Sam', objectiveId },
+        f.userId,
+      );
+
+      expect((await f.work.setDraft(f.org, mine.id, { status: 'drafting' }))?.draftStatus).toBe(
+        'drafting',
+      );
+      const ready = await f.work.setDraft(f.org, mine.id, {
+        status: 'ready',
+        draft: '# Subject\nHello',
+      });
+      expect(ready).toMatchObject({
+        draftStatus: 'ready',
+        draft: '# Subject\nHello',
+        draftError: null,
+      });
+      const failed = await f.work.setDraft(f.org, mine.id, { status: 'failed', error: 'refused' });
+      // A failed retry keeps the last good draft.
+      expect(failed).toMatchObject({
+        draftStatus: 'failed',
+        draftError: 'refused',
+        draft: '# Subject\nHello',
+      });
+      expect(await f.work.setDraft(f.otherOrg, mine.id, { status: 'drafting' })).toBeNull();
+
+      await f.work.updateWorkItem(f.org, mine.id, { status: 'done' });
+      expect(await f.work.progressByObjective(f.org, [objectiveId])).toEqual({
+        [objectiveId]: { done: 1, total: 2 },
+      });
+      expect(await f.work.progressByObjective(f.otherOrg, [objectiveId])).toEqual({});
+      expect(await f.work.progressByObjective(f.org, [])).toEqual({});
     });
   });
 }

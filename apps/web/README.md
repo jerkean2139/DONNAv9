@@ -23,8 +23,12 @@ staff, not another dark-mode dashboard:
 
 ## Live data
 
-- **Today** — objectives (list + create from the composer) and control-plane
-  health.
+- **Today** — objectives and control-plane health. Typing an outcome in the
+  command bar creates the objective and (when the API has `ANTHROPIC_API_KEY`)
+  Donna drafts a plan — client, project, sprint, tasks, subtasks — shown as a
+  card to approve, trim or dismiss. On approval the records are created, and
+  tasks Donna owns get drafted in the background; progress shows on Today and
+  drafts appear on each task under "Donna's draft".
 - **Clients → Projects → Sprints → Tasks → Subtasks** — the work hierarchy,
   with files (up to 10 MB, stored in Postgres) and links (Google Drive, Docs,
   Sheets, Slides, Dropbox, OneDrive, Notion, Figma, Loom, GitHub, any https URL)

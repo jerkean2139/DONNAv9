@@ -31,6 +31,7 @@ function shellFor(config: AuthConfig): ReactNode {
       <Suspense fallback={null}>
         <ClerkRoot
           publishableKey={config.clerkPublishableKey}
+          planner={config.planner === true}
           {...(config.clerkJwtTemplate !== undefined
             ? { jwtTemplate: config.clerkJwtTemplate }
             : {})}
@@ -43,7 +44,14 @@ function shellFor(config: AuthConfig): ReactNode {
       baseUrl,
       principalHeaders: devPrincipalHeaders(config.devPrincipal),
     });
-    return <App client={client} authMode="dev" account={<DevBadge />} />;
+    return (
+      <App
+        client={client}
+        authMode="dev"
+        planner={config.planner === true}
+        account={<DevBadge />}
+      />
+    );
   }
   // No sign-in configured: still show the shell; commands explain the 401.
   return <App client={new ControlPlaneClient({ baseUrl })} authMode="unconfigured" />;

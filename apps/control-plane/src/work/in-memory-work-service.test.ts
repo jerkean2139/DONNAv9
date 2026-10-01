@@ -8,4 +8,5 @@ describeWorkServiceContract('in-memory', async () => ({
   org: randomUUID(),
   userId: randomUUID(),
   otherOrg: randomUUID(),
+  makeObjective: async () => randomUUID(),
 }));

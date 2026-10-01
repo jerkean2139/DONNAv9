@@ -1,5 +1,6 @@
 import type { AuthMode, ObjectiveView } from '../types';
 import { DonnaAvatar } from './DonnaAvatar';
+import { PlanCard } from './PlanCard';
 import { StatusChip } from './StatusChip';
 
 const SUGGESTIONS = [
@@ -31,15 +32,33 @@ function donnaSays(objectives: ObjectiveView[], authMode: AuthMode): string {
   return blocked > 0 ? `${n}. ${blocked} need${blocked === 1 ? 's' : ''} you.` : `${n}. I’m on it.`;
 }
 
+export interface PlanActions {
+  approve: (objectiveId: string, taskIndexes: number[]) => Promise<void>;
+  dismiss: (objectiveId: string) => Promise<void>;
+  retry: (objectiveId: string) => Promise<void>;
+  openProject: (projectId: string) => void;
+}
+
 interface Props {
   objectives: ObjectiveView[];
   loading: boolean;
   authMode: AuthMode;
   onSuggest: (text: string) => void;
+  /** Whether Donna can plan (a model is configured). */
+  planner?: boolean;
+  plans?: PlanActions;
   now?: Date;
 }
 
-export function TodayView({ objectives, loading, authMode, onSuggest, now = new Date() }: Props) {
+export function TodayView({
+  objectives,
+  loading,
+  authMode,
+  onSuggest,
+  planner = false,
+  plans,
+  now = new Date(),
+}: Props) {
   const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
   const date = now.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 
@@ -84,6 +103,21 @@ export function TodayView({ objectives, loading, authMode, onSuggest, now = new 
               CLERK_PUBLISHABLE_KEY
             </code>{' '}
             to the API service in Railway, then reload — and I’m all yours.
+          </p>
+        </aside>
+      )}
+
+      {authMode !== 'unconfigured' && !planner && (
+        <aside role="note" aria-label="Planning" className="mt-8 border-l-2 border-edge pl-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
+            Editor’s note · Planning
+          </p>
+          <p className="mt-2 text-[14px] leading-relaxed text-muted">
+            I’ll track what you tell me, but I can’t plan or draft yet. Add{' '}
+            <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-[12px] text-ink">
+              ANTHROPIC_API_KEY
+            </code>{' '}
+            to the API service in Railway and I’ll turn each outcome into a plan.
           </p>
         </aside>
       )}
@@ -159,6 +193,15 @@ export function TodayView({ objectives, loading, authMode, onSuggest, now = new 
                   <div className="mt-2">
                     <StatusChip status={o.status} />
                   </div>
+                  {plans !== undefined && (
+                    <PlanCard
+                      objective={o}
+                      onApprove={(idx) => plans.approve(o.id, idx)}
+                      onDismiss={() => plans.dismiss(o.id)}
+                      onRetry={() => plans.retry(o.id)}
+                      onOpenProject={plans.openProject}
+                    />
+                  )}
                 </div>
               </li>
             ))}

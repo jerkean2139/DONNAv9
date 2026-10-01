@@ -75,4 +75,15 @@ export class DrizzleObjectiveService implements ObjectiveService {
       .limit(limit);
     return rows.map(rowToObjective);
   }
+
+  async activate(id: string, organizationId: string, projectId: string): Promise<Objective | null> {
+    const [row] = await this.db
+      .update(schema.objectives)
+      .set({ status: 'active', projectId, updatedAt: new Date() })
+      .where(
+        and(eq(schema.objectives.id, id), eq(schema.objectives.organizationId, organizationId)),
+      )
+      .returning();
+    return row === undefined ? null : rowToObjective(row);
+  }
 }

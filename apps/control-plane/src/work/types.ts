@@ -2,9 +2,11 @@ import type {
   AttachmentKind,
   AttachmentTarget,
   ClientStatus,
+  DraftStatus,
   LinkProvider,
   Scope,
   SprintStatus,
+  WorkItemOwner,
   WorkItemStatus,
 } from '@donna/core-domain';
 
@@ -49,6 +51,14 @@ export interface WorkItemView {
   readonly dueOn: string | null;
   readonly position: number;
   readonly createdAt: string;
+  /** The objective Donna planned this from, if any. */
+  readonly objectiveId: string | null;
+  readonly owner: WorkItemOwner;
+  /** Donna's markdown draft, for tasks she owns. */
+  readonly draft: string | null;
+  /** A `drafting` draft that has stalled past the timeout reads as `failed`. */
+  readonly draftStatus: DraftStatus;
+  readonly draftError: string | null;
 }
 
 export interface AttachmentView {
@@ -105,6 +115,18 @@ export interface CreateWorkItemInput {
   readonly sprintId?: string | null;
   readonly parentId?: string | null;
   readonly dueOn?: string;
+  readonly objectiveId?: string | null;
+  readonly owner?: WorkItemOwner;
+}
+
+export type DraftUpdate =
+  | { readonly status: 'drafting' }
+  | { readonly status: 'ready'; readonly draft: string }
+  | { readonly status: 'failed'; readonly error: string };
+
+export interface ObjectiveProgress {
+  readonly done: number;
+  readonly total: number;
 }
 
 export interface UpdateWorkItemInput {
@@ -169,6 +191,13 @@ export interface WorkService {
   updateWorkItem(org: string, id: string, input: UpdateWorkItemInput): Promise<WorkItemView | null>;
   /** Deletes a task and (by cascade) its subtasks and attachments. */
   deleteWorkItem(org: string, id: string): Promise<boolean>;
+  /** Record Donna's draft lifecycle for a task. */
+  setDraft(org: string, id: string, update: DraftUpdate): Promise<WorkItemView | null>;
+  /** Tasks done / total per objective (subtasks included), for the given ids. */
+  progressByObjective(
+    org: string,
+    objectiveIds: readonly string[],
+  ): Promise<Record<string, ObjectiveProgress>>;
 
   listAttachments(org: string, target: AttachmentRef): Promise<AttachmentView[]>;
   getAttachment(org: string, id: string): Promise<AttachmentView | null>;

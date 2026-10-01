@@ -1,15 +1,18 @@
 import {
   ATTACHMENT_KINDS,
   CLIENT_STATUSES,
+  DRAFT_STATUSES,
   EVENT_TYPES,
   EXECUTION_CLASSES,
   OBJECTIVE_STATUSES,
+  PLAN_STATUSES,
   RISK_LEVELS,
   ROLES,
   SCOPES,
   SOURCE_CONFIDENCE,
   SPRINT_STATUSES,
   TASK_STATUSES,
+  WORK_ITEM_OWNERS,
   WORK_ITEM_STATUSES,
 } from '@donna/core-domain';
 import { describe, expect, it } from 'vitest';
@@ -17,15 +20,18 @@ import { describe, expect, it } from 'vitest';
 import {
   attachmentKindEnum,
   clientStatusEnum,
+  draftStatusEnum,
   eventTypeEnum,
   executionClassEnum,
   objectiveStatusEnum,
+  planStatusEnum,
   riskLevelEnum,
   roleEnum,
   scopeEnum,
   sourceConfidenceEnum,
   sprintStatusEnum,
   taskStatusEnum,
+  workItemOwnerEnum,
   workItemStatusEnum,
 } from './schema/enums.js';
 import {
@@ -68,6 +74,9 @@ describe('schema enums mirror core-domain', () => {
   it('work item status', () =>
     expect(workItemStatusEnum.enumValues).toEqual([...WORK_ITEM_STATUSES]));
   it('attachment kind', () => expect(attachmentKindEnum.enumValues).toEqual([...ATTACHMENT_KINDS]));
+  it('work item owner', () => expect(workItemOwnerEnum.enumValues).toEqual([...WORK_ITEM_OWNERS]));
+  it('draft status', () => expect(draftStatusEnum.enumValues).toEqual([...DRAFT_STATUSES]));
+  it('plan status', () => expect(planStatusEnum.enumValues).toEqual([...PLAN_STATUSES]));
 });
 
 describe('control-plane tables are defined and org-scoped', () => {
