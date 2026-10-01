@@ -11,3 +11,4 @@ export * from './execution.js';
 export * from './governance.js';
 export * from './business-graph.js';
 export * from './business-constitution.js';
+export * from './work.js';

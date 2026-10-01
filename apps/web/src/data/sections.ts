@@ -1,19 +1,13 @@
 import type { NavSection } from '../types';
 
-// The app's sections. Only Today is backed by the API so far; the others show
-// an honest "not connected yet" state instead of fabricated data.
+// The app's sections. Today and the client work hierarchy (Clients → Projects
+// → Sprints → Tasks) are live; the others show an honest "not connected yet"
+// state instead of fabricated data.
 export const SECTIONS: NavSection[] = [
   { key: 'today', label: 'Today', live: true },
-  {
-    key: 'projects',
-    label: 'Projects',
-    blurb: 'Your objectives, grouped into the bigger bets they serve.',
-  },
-  {
-    key: 'tasks',
-    label: 'Tasks',
-    blurb: 'Everything I and the team are doing to get your objectives over the line.',
-  },
+  { key: 'clients', label: 'Clients', live: true },
+  { key: 'projects', label: 'Projects', live: true },
+  { key: 'tasks', label: 'Tasks', live: true },
   {
     key: 'leads',
     label: 'Leads',
@@ -37,4 +31,4 @@ export const SECTIONS: NavSection[] = [
 ];
 
 /** Sections that get their own tab on phones; the rest live under "More". */
-export const PRIMARY_TABS = ['today', 'projects', 'tasks', 'leads'];
+export const PRIMARY_TABS = ['today', 'clients', 'tasks', 'leads'];

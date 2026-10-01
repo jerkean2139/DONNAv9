@@ -11,6 +11,8 @@ import { WebhookVerificationError, type WebhookVerifier } from './webhooks/clerk
 import type { ProvisioningService } from './webhooks/provisioning.js';
 import type { ObjectiveService } from './services/objective-service.js';
 import type { TaskDispatcher } from './services/task-dispatcher.js';
+import { registerWorkRoutes } from './work/routes.js';
+import type { WorkService } from './work/types.js';
 
 export interface ServerDeps {
   readonly objectiveService: ObjectiveService;
@@ -43,6 +45,11 @@ export interface ServerDeps {
    * the dev-shim identity outside production) — never a secret.
    */
   readonly clientConfig?: ClientConfig;
+  /**
+   * The client work hierarchy (Client → Project → Sprint → Task → Subtask,
+   * with attachments). When present, its routes are registered.
+   */
+  readonly work?: WorkService;
 }
 
 export type ClientConfig =
@@ -140,6 +147,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   }
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  if (deps.work !== undefined) {
+    registerWorkRoutes(app, { work: deps.work, authenticate: deps.authenticate });
+  }
 
   app.get('/client-config', async () => deps.clientConfig ?? { auth: 'unconfigured' });
 

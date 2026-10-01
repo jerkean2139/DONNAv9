@@ -23,9 +23,16 @@ staff, not another dark-mode dashboard:
 
 ## Live data
 
-Objectives (list + create from the command bar) and control-plane health are
-live. Sections without an API yet (Projects, Tasks, Leads, People, Memory,
-Automations) show an honest "Not connected yet" state — no fabricated data.
+- **Today** — objectives (list + create from the composer) and control-plane
+  health.
+- **Clients → Projects → Sprints → Tasks → Subtasks** — the work hierarchy,
+  with files (up to 10 MB, stored in Postgres) and links (Google Drive, Docs,
+  Sheets, Slides, Dropbox, OneDrive, Notion, Figma, Loom, GitHub, any https URL)
+  attachable at every level. Clients, Tasks and (under More) Projects are tabs;
+  drilling down stays in the tab you started from.
+- Sections without an API yet (Leads, People, Memory, Automations) show an
+  honest "Not connected yet" state — no fabricated data.
+
 `apps/web` stays behind the API boundary — it never imports `@donna/db` or
 `@donna/policy` (enforced in CI).
 

@@ -102,3 +102,12 @@ export const sourceConfidenceEnum = pgEnum('source_confidence', [
   'INFERRED',
   'UNVERIFIED',
 ]);
+
+// Client work hierarchy (core-domain work.ts).
+export const clientStatusEnum = pgEnum('client_status', ['active', 'paused', 'archived']);
+
+export const sprintStatusEnum = pgEnum('sprint_status', ['planned', 'active', 'completed']);
+
+export const workItemStatusEnum = pgEnum('work_item_status', ['todo', 'in_progress', 'done']);
+
+export const attachmentKindEnum = pgEnum('attachment_kind', ['link', 'file']);

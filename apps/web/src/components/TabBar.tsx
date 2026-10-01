@@ -15,7 +15,10 @@ export function TabBar({ tabs, active, moreActive, onSelect }: Props) {
     { key: 'more', label: 'More' },
   ];
   return (
-    <nav aria-label="Tabs" className="safe-bottom relative z-10 shrink-0 md:hidden">
+    <nav
+      aria-label="Tabs"
+      className="safe-bottom relative z-10 shrink-0 border-t border-edge/70 bg-surface/90 backdrop-blur md:hidden"
+    >
       <ul className="safe-x flex justify-between">
         {items.map(({ key, label }) => {
           const selected = key === 'more' ? moreActive : active === key;
