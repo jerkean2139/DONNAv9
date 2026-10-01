@@ -69,6 +69,7 @@ function objectiveResource(objective: Objective, principal: PrincipalContext): R
 }
 
 const OBJECTIVE_LIST_LIMIT = 50;
+const OBJECTIVE_EVENT_LIMIT = 500;
 
 function svixHeaders(headers: Record<string, unknown>): Record<string, string> {
   const pick = (key: string): string => {
@@ -238,6 +239,46 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
 
     return objective;
+  });
+
+  // The objective's activity thread (the web app's kitchen view): every recorded
+  // event for it, oldest first. Same tenant scoping and read policy as
+  // `GET /objectives/:id`, so an unreadable objective's activity reads as 404.
+  // Payload references are not exposed; only who did what, and when.
+  app.get('/objectives/:id/events', async (request, reply) => {
+    const auth = await deps.authenticate(request.headers as Record<string, unknown>);
+    if (!auth.ok) {
+      return reply.code(auth.status).send({ error: auth.error });
+    }
+    const principal = auth.principal;
+    const { id } = request.params as { id: string };
+    const objective = await deps.objectiveService.get(id, principal.organizationId);
+    if (objective === null) {
+      return reply.code(404).send({ error: 'not_found' });
+    }
+    const decision = evaluate({
+      principal,
+      action: OBJECTIVE_READ_ACTION,
+      resource: objectiveResource(objective, principal),
+    });
+    if (decision.effect !== 'allow') {
+      return reply.code(404).send({ error: 'not_found' });
+    }
+
+    const events = await deps.objectiveService.events(
+      id,
+      principal.organizationId,
+      OBJECTIVE_EVENT_LIMIT,
+    );
+    return {
+      events: events.map((e) => ({
+        id: e.id,
+        type: e.type,
+        actor: e.actor,
+        createdAt: e.createdAt.toISOString(),
+        ...(e.taskId !== undefined ? { taskId: e.taskId } : {}),
+      })),
+    };
   });
 
   // The enqueue path (Technical Plan §4.1/§5): create a durable task under an

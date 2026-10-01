@@ -1,4 +1,4 @@
-import type { ObjectiveView } from '../types';
+import type { ActivityEventView, ObjectiveView } from '../types';
 
 // Typed client for the control-plane API. Same-origin by default (the
 // control-plane serves this app). Requests are signed by `authHeaders`: a Clerk
@@ -99,6 +99,17 @@ export class ControlPlaneClient {
     if (!res.ok) throw new ApiError(res.status, await errorCode(res));
     const body = (await res.json()) as { objectives: ObjectiveView[] };
     return body.objectives;
+  }
+
+  /** The objective's recorded activity, oldest first (the kitchen thread). */
+  async listObjectiveEvents(objectiveId: string): Promise<ActivityEventView[]> {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/objectives/${encodeURIComponent(objectiveId)}/events`,
+      { headers: await this.signed() },
+    );
+    if (!res.ok) throw new ApiError(res.status, await errorCode(res));
+    const body = (await res.json()) as { events: ActivityEventView[] };
+    return body.events;
   }
 
   async createObjective(body: CreateObjectiveRequest): Promise<CreateObjectiveResult> {

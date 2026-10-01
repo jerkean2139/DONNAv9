@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +12,7 @@ function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneCl
     health: vi.fn().mockResolvedValue({ status: 'ok' }),
     clientConfig: vi.fn().mockResolvedValue({ auth: 'unconfigured' }),
     listObjectives: vi.fn().mockResolvedValue([]),
+    listObjectiveEvents: vi.fn().mockResolvedValue([]),
     createObjective: vi.fn(async ({ requestedOutcome }: { requestedOutcome: string }) => {
       seq += 1;
       const objective: ObjectiveView = { id: `o${seq}`, requestedOutcome, status: 'draft' };
@@ -80,5 +81,65 @@ describe('App shell', () => {
     await screen.findByText('ok');
     await user.click(screen.getByRole('button', { name: 'Leads' }));
     expect(screen.getByRole('heading', { name: 'Leads' })).toBeInTheDocument();
+  });
+
+  it('opens the kitchen thread for an objective with its recorded steps', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient({
+      listObjectives: vi
+        .fn()
+        .mockResolvedValue([{ id: 'o1', requestedOutcome: 'Ship Route 40', status: 'active' }]),
+      listObjectiveEvents: vi.fn().mockResolvedValue([
+        {
+          id: 'e1',
+          type: 'objective.created',
+          actor: { type: 'human', id: 'u1' },
+          createdAt: '2026-10-01T12:00:00.000Z',
+        },
+        {
+          id: 'e2',
+          type: 'task.completed',
+          actor: { type: 'adapter', id: 'anthropic' },
+          createdAt: '2026-10-01T12:01:00.000Z',
+          taskId: 'abcdef1234567890',
+        },
+      ]),
+    });
+    render(<App client={client} />);
+    await user.click(await screen.findByRole('button', { name: /Ship Route 40/ }));
+
+    const thread = await screen.findByLabelText('Kitchen thread');
+    expect(client.listObjectiveEvents).toHaveBeenCalledWith('o1');
+    expect(await within(thread).findByText(/Opened this objective/)).toBeInTheDocument();
+    expect(within(thread).getByText('Worker · anthropic')).toBeInTheDocument();
+    expect(within(thread).getByText('Finished the task.')).toBeInTheDocument();
+    expect(within(thread).getByText('task abcdef12')).toBeInTheDocument();
+
+    await user.click(within(thread).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByLabelText('Kitchen thread')).not.toBeInTheDocument();
+  });
+
+  it('toggles the kitchen from the header and explains an empty selection', async () => {
+    const user = userEvent.setup();
+    render(<App client={fakeClient()} />);
+    await screen.findByText('ok');
+    const toggle = screen.getByRole('button', { name: 'Kitchen' });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Pick an objective/)).toBeInTheDocument();
+  });
+
+  it('explains a kitchen thread the API refuses', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient({
+      listObjectives: vi
+        .fn()
+        .mockResolvedValue([{ id: 'o1', requestedOutcome: 'Ship Route 40', status: 'active' }]),
+      listObjectiveEvents: vi.fn().mockRejectedValue(new ApiError(401, 'missing_bearer_token')),
+    });
+    render(<App client={client} />);
+    await user.click(await screen.findByRole('button', { name: /Ship Route 40/ }));
+    const thread = await screen.findByLabelText('Kitchen thread');
+    expect(await within(thread).findByRole('alert')).toHaveTextContent('Not signed in');
   });
 });

@@ -1,12 +1,18 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Objective, ObjectiveId, OrganizationId, UserId } from '@donna/core-domain';
+import type {
+  EventEnvelope,
+  Objective,
+  ObjectiveId,
+  OrganizationId,
+  UserId,
+} from '@donna/core-domain';
 import { eventEnvelopeToRow, schema, type DonnaDatabase } from '@donna/db';
 import { createEvent } from '@donna/events';
 import type { PrincipalContext } from '@donna/policy';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 
-import { objectiveToRow, rowToObjective } from '../db/mappers.js';
+import { objectiveToRow, rowToEvent, rowToObjective } from '../db/mappers.js';
 import type { CreateObjectiveInput, ObjectiveService } from './objective-service.js';
 
 /**
@@ -74,5 +80,38 @@ export class DrizzleObjectiveService implements ObjectiveService {
       .orderBy(desc(schema.objectives.createdAt))
       .limit(limit);
     return rows.map(rowToObjective);
+  }
+
+  async events(
+    objectiveId: string,
+    organizationId: string,
+    limit: number,
+  ): Promise<EventEnvelope[]> {
+    // The worker records task events by task id alone (no objective id), so
+    // match the objective's own events and those of every task under it.
+    const objectiveTasks = this.db
+      .select({ id: schema.tasks.id })
+      .from(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.objectiveId, objectiveId),
+          eq(schema.tasks.organizationId, organizationId),
+        ),
+      );
+    const rows = await this.db
+      .select()
+      .from(schema.events)
+      .where(
+        and(
+          eq(schema.events.organizationId, organizationId),
+          or(
+            eq(schema.events.objectiveId, objectiveId),
+            inArray(schema.events.taskId, objectiveTasks),
+          ),
+        ),
+      )
+      .orderBy(asc(schema.events.createdAt))
+      .limit(limit);
+    return rows.map(rowToEvent);
   }
 }

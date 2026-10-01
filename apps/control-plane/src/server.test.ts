@@ -414,6 +414,60 @@ describe('GET /objectives', () => {
   });
 });
 
+describe('GET /objectives/:id/events', () => {
+  it('requires authentication', async () => {
+    const { app } = makeApp();
+    const id = await createObjective(app);
+    const res = await app.inject({ method: 'GET', url: `/objectives/${id}/events` });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns the objective activity oldest first, without payload refs', async () => {
+    const { app } = makeApp();
+    const id = await createObjective(app);
+    await app.inject({
+      method: 'POST',
+      url: `/objectives/${id}/tasks`,
+      headers: memberHeaders,
+      payload: { goal: 'Summarize', definitionOfDone: 'A summary' },
+    });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}/events`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+    const events = res.json().events as Record<string, unknown>[];
+    expect(events.map((e) => e.type)).toEqual(['objective.created', 'task.created']);
+    expect(events[0]?.actor).toEqual({ type: 'orchestrator', id: 'u1' });
+    expect(typeof events[0]?.createdAt).toBe('string');
+    expect(events[1]?.taskId).toEqual(expect.any(String));
+    expect(events.every((e) => !('payloadRef' in e))).toBe(true);
+  });
+
+  it('reads as 404 across the tenant boundary', async () => {
+    const { app } = makeApp();
+    const id = await createObjective(app);
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}/events`,
+      headers: otherOrgHeaders,
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('hides a PRIVATE objective activity from another same-org user', async () => {
+    const { app } = makeApp();
+    const id = await createScoped(app, 'PRIVATE');
+    const res = await app.inject({
+      method: 'GET',
+      url: `/objectives/${id}/events`,
+      headers: sameOrgOtherUserHeaders,
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
 describe('GET /client-config', () => {
   it('reports unconfigured auth by default', async () => {
     const { app } = makeApp();

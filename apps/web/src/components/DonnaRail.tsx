@@ -22,7 +22,10 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 export function DonnaRail({ objective, work, approvals, alerts, nextAction }: Props) {
   const blockers = work.filter((w) => w.state === 'blocked');
   return (
-    <aside className="overflow-auto border-l border-edge bg-panel" aria-label="Donna rail">
+    <aside
+      className="min-h-full border-t border-edge bg-panel lg:border-l lg:border-t-0"
+      aria-label="Donna rail"
+    >
       <Group title="Objective">
         {objective === null ? (
           <span className="text-muted">None yet</span>

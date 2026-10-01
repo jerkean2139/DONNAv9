@@ -29,7 +29,10 @@ export function CommandBar({ onSubmit, status = { kind: 'idle' } }: Props) {
   }
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="border-t border-edge bg-panel p-3">
+    <form
+      onSubmit={(e) => void handleSubmit(e)}
+      className="shrink-0 border-t border-edge bg-panel p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+    >
       <input
         aria-label="Command Donna"
         placeholder="Tell Donna an outcome…"

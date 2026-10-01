@@ -6,6 +6,7 @@ import { CommandBar, type CommandStatus } from './components/CommandBar';
 import { ContextNav } from './components/ContextNav';
 import { DonnaRail } from './components/DonnaRail';
 import { HealthBar } from './components/HealthBar';
+import { KitchenThread, type KitchenState } from './components/KitchenThread';
 import {
   MOCK_ALERTS,
   MOCK_APPROVALS,
@@ -17,6 +18,16 @@ import {
 import type { HealthView, ObjectiveView } from './types';
 
 const HEALTH_POLL_MS = 30_000;
+// How often an open kitchen thread re-reads the objective's activity.
+const KITCHEN_POLL_MS = 5_000;
+
+// Column templates. Phones get one scrolling column; laptops get side-by-side
+// panes that each scroll on their own. With the kitchen open, the thread takes
+// the right-hand pane and the rail returns beside it on very wide screens.
+const COLUMNS_DEFAULT =
+  'lg:grid-cols-[220px_minmax(0,1fr)_300px] xl:grid-cols-[240px_minmax(0,1fr)_340px]';
+const COLUMNS_KITCHEN =
+  'lg:grid-cols-[200px_minmax(0,1fr)_minmax(380px,42%)] 2xl:grid-cols-[220px_minmax(0,1fr)_minmax(420px,38%)_320px]';
 
 interface Props {
   client: ControlPlaneClient;
@@ -42,6 +53,9 @@ export function App({ client, account }: Props) {
   const [objectives, setObjectives] = useState<ObjectiveView[]>([]);
   const [controlPlane, setControlPlane] = useState<HealthView['controlPlane']>('checking');
   const [status, setStatus] = useState<CommandStatus>({ kind: 'idle' });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [kitchenOpen, setKitchenOpen] = useState(false);
+  const [kitchen, setKitchen] = useState<KitchenState>({ kind: 'loading' });
 
   const activeSection = useMemo(
     () => NAV_SECTIONS.find((s) => s.key === activeKey) ?? NAV_SECTIONS[0]!,
@@ -95,6 +109,7 @@ export function App({ client, account }: Props) {
         return true;
       }
       setObjectives((prev) => [result.objective, ...prev]);
+      setSelectedId(result.objective.id);
       setStatus({ kind: 'notice', message: 'Objective created.' });
       return true;
     } catch (error) {
@@ -103,26 +118,75 @@ export function App({ client, account }: Props) {
     }
   }
 
-  const current = objectives[0] ?? null;
+  const current = objectives.find((o) => o.id === selectedId) ?? objectives[0] ?? null;
+  const currentId = current?.id ?? null;
+
+  // Keep the open kitchen thread fresh for the selected objective.
+  useEffect(() => {
+    if (!kitchenOpen || currentId === null) return;
+    let cancelled = false;
+    setKitchen({ kind: 'loading' });
+    const load = () =>
+      client.listObjectiveEvents(currentId).then(
+        (events) => {
+          if (!cancelled) setKitchen({ kind: 'ready', events });
+        },
+        (error: unknown) => {
+          if (!cancelled) setKitchen({ kind: 'error', message: describeError(error) });
+        },
+      );
+    void load();
+    const timer = setInterval(() => void load(), KITCHEN_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [client, kitchenOpen, currentId]);
+
+  function openObjective(id: string) {
+    setSelectedId(id);
+    setKitchenOpen(true);
+  }
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface text-ink">
-      <HealthBar health={{ ...MOCK_HEALTH, controlPlane }} account={account} />
-      <div className="grid min-h-0 grid-cols-[220px_1fr_300px]">
+    <div className="flex h-dvh flex-col bg-surface text-ink">
+      <HealthBar
+        health={{ ...MOCK_HEALTH, controlPlane }}
+        account={account}
+        kitchenOpen={kitchenOpen}
+        onToggleKitchen={() => setKitchenOpen((open) => !open)}
+      />
+      <div
+        className={`min-h-0 flex-1 overflow-auto lg:grid lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden ${
+          kitchenOpen ? COLUMNS_KITCHEN : COLUMNS_DEFAULT
+        }`}
+      >
         <ContextNav sections={NAV_SECTIONS} active={activeKey} onSelect={setActiveKey} />
-        <ActiveWorkspace
-          section={activeSection}
-          objective={current}
-          objectives={objectives}
-          work={MOCK_WORK}
-        />
-        <DonnaRail
-          objective={current}
-          work={MOCK_WORK}
-          approvals={MOCK_APPROVALS}
-          alerts={MOCK_ALERTS}
-          nextAction={MOCK_NEXT_ACTION}
-        />
+        <div className={`lg:min-h-0 lg:overflow-auto ${kitchenOpen ? 'hidden lg:block' : ''}`}>
+          <ActiveWorkspace
+            section={activeSection}
+            objective={current}
+            objectives={objectives}
+            work={MOCK_WORK}
+            onOpenObjective={openObjective}
+          />
+        </div>
+        {kitchenOpen && (
+          <KitchenThread
+            objective={current}
+            state={kitchen}
+            onClose={() => setKitchenOpen(false)}
+          />
+        )}
+        <div className={`lg:min-h-0 lg:overflow-auto ${kitchenOpen ? 'hidden 2xl:block' : ''}`}>
+          <DonnaRail
+            objective={current}
+            work={MOCK_WORK}
+            approvals={MOCK_APPROVALS}
+            alerts={MOCK_ALERTS}
+            nextAction={MOCK_NEXT_ACTION}
+          />
+        </div>
       </div>
       <CommandBar onSubmit={handleCommand} status={status} />
     </div>

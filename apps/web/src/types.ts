@@ -38,3 +38,13 @@ export interface NavSection {
   key: string;
   label: string;
 }
+
+/** One recorded step in an objective's activity thread (the kitchen view). */
+export interface ActivityEventView {
+  id: string;
+  type: string;
+  actor: { type: 'human' | 'orchestrator' | 'adapter' | 'checker'; id: string };
+  /** ISO-8601 timestamp. */
+  createdAt: string;
+  taskId?: string;
+}
