@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "DONNA V2 control-plane API skeleton (Fastify): identity → policy → objective/task → event outbox.",
+  "description": "DONNA V2 control-plane API skeleton (Fastify): identity \u2192 policy \u2192 objective/task \u2192 event outbox.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -17,6 +17,9 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@donna/adapter-anthropic": "workspace:*",
+    "@donna/adapter-base": "workspace:*",
+    "@donna/config": "workspace:*",
     "@donna/core-domain": "workspace:*",
     "@donna/db": "workspace:*",
     "@donna/events": "workspace:*",

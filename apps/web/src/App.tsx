@@ -22,10 +22,21 @@ import type { AuthMode, ControlPlaneHealth, ObjectiveView } from './types';
 const HEALTH_POLL_MS = 30_000;
 const NOTICE_MS = 3_000;
 
+const PLAN_POLL_MS = 2_500;
+
+/** The user's local calendar date, YYYY-MM-DD (Donna plans relative to it). */
+function localToday(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 interface Props {
   client: ControlPlaneClient;
   /** How requests are signed; 'unconfigured' disables commands up front. */
   authMode?: AuthMode;
+  /** Whether Donna can plan and draft (from /client-config). */
+  planner?: boolean;
   /** The signed-in user's control (e.g. Clerk's UserButton or a dev badge). */
   account?: ReactNode;
 }
@@ -37,13 +48,18 @@ function describeError(error: unknown): string {
     if (error.code === 'no_account')
       return 'Signed in, but your account is not provisioned in DONNA yet.';
     if (error.code === 'mfa_required') return 'Multi-factor authentication is required.';
+    if (error.code === 'planner_unconfigured')
+      return 'I can’t plan yet — my model isn’t configured.';
+    if (error.code === 'plan_stale')
+      return 'Something in that plan changed since I drafted it — plan it again.';
+    if (error.code === 'already_planned') return 'That one’s already planned.';
     if (error.status === 403) return 'You are not allowed to create that objective.';
     return `The API refused the request (${error.code}).`;
   }
   return 'Could not reach the DONNA API.';
 }
 
-export function App({ client, authMode = 'dev', account }: Props) {
+export function App({ client, authMode = 'dev', planner = false, account }: Props) {
   const [route, setRoute] = useState<Route>({ view: 'today' });
   // The tab you're in. Drilling down (client → project → task) stays in the
   // tab you started from, like an iOS navigation stack.
@@ -101,6 +117,52 @@ export function App({ client, authMode = 'dev', account }: Props) {
     };
   }, [client, authMode]);
 
+  // While Donna is drafting a plan, check back until it lands.
+  const drafting = objectives.some((o) => o.plan?.status === 'drafting');
+  useEffect(() => {
+    if (!drafting) return;
+    const timer = setInterval(() => {
+      client.listObjectives().then(setObjectives, () => {});
+    }, PLAN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [drafting, client]);
+
+  const refreshObjectives = useCallback(async () => {
+    setObjectives(await client.listObjectives());
+  }, [client]);
+
+  const planActions = {
+    approve: async (objectiveId: string, taskIndexes: number[]) => {
+      try {
+        await client.approvePlan(objectiveId, taskIndexes);
+        await refreshObjectives();
+        setStatus({ kind: 'notice', message: 'Done — it’s all set up. I’m on my part.' });
+      } catch (error) {
+        setStatus({ kind: 'error', message: describeError(error) });
+      }
+    },
+    dismiss: async (objectiveId: string) => {
+      try {
+        await client.dismissPlan(objectiveId);
+        await refreshObjectives();
+      } catch (error) {
+        setStatus({ kind: 'error', message: describeError(error) });
+      }
+    },
+    retry: async (objectiveId: string) => {
+      try {
+        await client.startPlan(objectiveId, localToday(), true);
+        await refreshObjectives();
+      } catch (error) {
+        setStatus({ kind: 'error', message: describeError(error) });
+      }
+    },
+    openProject: (projectId: string) => {
+      setTab('clients');
+      navigate({ view: 'project', id: projectId });
+    },
+  };
+
   // Confirmations fade on their own; errors stay until the next action.
   useEffect(() => {
     if (status.kind !== 'notice') return;
@@ -125,7 +187,20 @@ export function App({ client, authMode = 'dev', account }: Props) {
         return true;
       }
       setObjectives((prev) => [result.objective, ...prev]);
-      setStatus({ kind: 'notice', message: 'Got it — it’s on the agenda.' });
+      if (!planner) {
+        setStatus({ kind: 'notice', message: 'Got it — it’s on the agenda.' });
+        return true;
+      }
+      // Hand it straight to Donna to plan.
+      try {
+        const plan = await client.startPlan(result.objective.id, localToday());
+        setObjectives((prev) =>
+          prev.map((o) => (o.id === result.objective.id ? { ...o, plan } : o)),
+        );
+        setStatus({ kind: 'notice', message: 'Got it — I’m drafting a plan.' });
+      } catch (error) {
+        setStatus({ kind: 'error', message: describeError(error) });
+      }
       return true;
     } catch (error) {
       setStatus({ kind: 'error', message: describeError(error) });
@@ -146,6 +221,8 @@ export function App({ client, authMode = 'dev', account }: Props) {
           objectives={objectives}
           loading={loading}
           authMode={authMode}
+          planner={planner}
+          plans={planActions}
           onSuggest={(text) => setPrefill({ text, nonce: Date.now() })}
         />
       );
@@ -166,7 +243,15 @@ export function App({ client, authMode = 'dev', account }: Props) {
       view = <TasksView client={client} navigate={navigate} />;
       break;
     case 'task':
-      view = <TaskView key={route.id} client={client} id={route.id} navigate={navigate} />;
+      view = (
+        <TaskView
+          key={route.id}
+          client={client}
+          id={route.id}
+          navigate={navigate}
+          planner={planner}
+        />
+      );
       break;
     case 'more':
       view = <MoreView sections={overflow} onSelect={selectSection} />;

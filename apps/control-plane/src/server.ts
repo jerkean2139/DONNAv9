@@ -11,6 +11,8 @@ import { WebhookVerificationError, type WebhookVerifier } from './webhooks/clerk
 import type { ProvisioningService } from './webhooks/provisioning.js';
 import type { ObjectiveService } from './services/objective-service.js';
 import type { TaskDispatcher } from './services/task-dispatcher.js';
+import type { PlanService } from './planning/plan-service.js';
+import { registerPlanRoutes } from './planning/routes.js';
 import { registerWorkRoutes } from './work/routes.js';
 import type { WorkService } from './work/types.js';
 
@@ -50,6 +52,12 @@ export interface ServerDeps {
    * with attachments). When present, its routes are registered.
    */
   readonly work?: WorkService;
+  /**
+   * Donna's planning loop (outcome → plan → approval → tasks → drafts).
+   * Requires `work`. When present, plan routes are registered and objectives
+   * carry their plan and progress.
+   */
+  readonly planning?: PlanService;
 }
 
 export type ClientConfig =
@@ -150,9 +158,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   if (deps.work !== undefined) {
     registerWorkRoutes(app, { work: deps.work, authenticate: deps.authenticate });
+    if (deps.planning !== undefined) {
+      registerPlanRoutes(app, {
+        planning: deps.planning,
+        objectives: deps.objectiveService,
+        work: deps.work,
+        authenticate: deps.authenticate,
+      });
+    }
   }
 
-  app.get('/client-config', async () => deps.clientConfig ?? { auth: 'unconfigured' });
+  app.get('/client-config', async () => ({
+    ...(deps.clientConfig ?? { auth: 'unconfigured' }),
+    // Whether Donna can plan and draft (a model is configured).
+    planner: deps.planning?.available ?? false,
+  }));
 
   // The caller's recent objectives. Tenant-scoped in the query, then filtered by
   // the same read policy as `GET /objectives/:id`, so an objective the caller
@@ -175,7 +195,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           resource: objectiveResource(objective, principal),
         }).effect === 'allow',
     );
-    return { objectives: visible };
+    if (deps.planning === undefined) return { objectives: visible };
+    const extras = await deps.planning.extras(
+      principal.organizationId,
+      visible.map((o) => o.id),
+    );
+    return {
+      objectives: visible.map((o) => ({
+        ...o,
+        plan: extras[o.id]?.plan ?? null,
+        progress: extras[o.id]?.progress ?? null,
+      })),
+    };
   });
 
   app.post('/objectives', async (request, reply) => {

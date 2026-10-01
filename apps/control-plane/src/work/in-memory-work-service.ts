@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  effectiveDraft,
   cleanContentType,
   cleanFilename,
   linkTitle,
@@ -21,6 +22,8 @@ import {
   type CreateProjectInput,
   type CreateSprintInput,
   type CreateWorkItemInput,
+  type DraftUpdate,
+  type ObjectiveProgress,
   type ProjectView,
   type SprintView,
   type UpdateClientInput,
@@ -31,6 +34,7 @@ import {
 } from './types.js';
 
 type Owned<T> = T & { readonly org: string };
+type StoredItem = Owned<WorkItemView> & { readonly draftUpdatedAt: Date | null };
 type StoredClient = Owned<Omit<ClientView, 'projectCount'>>;
 
 /**
@@ -41,7 +45,7 @@ export class InMemoryWorkService implements WorkService {
   private readonly clients = new Map<string, StoredClient>();
   private readonly projects = new Map<string, Owned<ProjectView>>();
   private readonly sprints = new Map<string, Owned<SprintView>>();
-  private readonly items = new Map<string, Owned<WorkItemView>>();
+  private readonly items = new Map<string, StoredItem>();
   private readonly attachments = new Map<string, Owned<AttachmentView>>();
   private readonly files = new Map<string, Buffer>();
   private clock = 0;
@@ -61,6 +65,11 @@ export class InMemoryWorkService implements WorkService {
     const rest: Partial<T> = { ...row };
     delete rest.org;
     return rest as Omit<T, 'org'>;
+  }
+
+  private itemView(row: StoredItem): WorkItemView {
+    const { draftUpdatedAt, ...rest } = this.strip(row);
+    return { ...rest, ...effectiveDraft(row.draftStatus, row.draftError, draftUpdatedAt) };
   }
 
   private clientView(row: StoredClient): ClientView {
@@ -228,12 +237,12 @@ export class InMemoryWorkService implements WorkService {
           (filter.open !== true || w.status !== 'done'),
       )
       .sort((a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt))
-      .map((w) => this.strip(w));
+      .map((w) => this.itemView(w));
   }
 
   async getWorkItem(org: string, id: string): Promise<WorkItemView | null> {
     const row = this.owned(this.items, org, id);
-    return row === null ? null : this.strip(row);
+    return row === null ? null : this.itemView(row);
   }
 
   async createWorkItem(org: string, input: CreateWorkItemInput): Promise<WorkItemView> {
@@ -261,7 +270,7 @@ export class InMemoryWorkService implements WorkService {
     const siblings = [...this.items.values()].filter(
       (w) => w.org === org && w.projectId === input.projectId && w.parentId === parentId,
     );
-    const row: Owned<WorkItemView> = {
+    const row: StoredItem = {
       org,
       id: randomUUID(),
       projectId: input.projectId,
@@ -272,9 +281,15 @@ export class InMemoryWorkService implements WorkService {
       dueOn,
       position: siblings.reduce((max, w) => Math.max(max, w.position + 1), 0),
       createdAt: this.now(),
+      objectiveId: input.objectiveId ?? null,
+      owner: input.owner ?? 'you',
+      draft: null,
+      draftStatus: 'none',
+      draftError: null,
+      draftUpdatedAt: null,
     };
     this.items.set(row.id, row);
-    return this.strip(row);
+    return this.itemView(row);
   }
 
   async updateWorkItem(
@@ -295,7 +310,7 @@ export class InMemoryWorkService implements WorkService {
       }
       sprintId = input.sprintId;
     }
-    const next: Owned<WorkItemView> = {
+    const next: StoredItem = {
       ...row,
       ...(input.title !== undefined ? { title: requireName(input.title, 'title_required') } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
@@ -311,7 +326,35 @@ export class InMemoryWorkService implements WorkService {
           this.items.set(child.id, { ...child, sprintId });
       }
     }
-    return this.strip(next);
+    return this.itemView(next);
+  }
+
+  async setDraft(org: string, id: string, update: DraftUpdate): Promise<WorkItemView | null> {
+    const row = this.owned(this.items, org, id);
+    if (row === null) return null;
+    const next: StoredItem = {
+      ...row,
+      draftStatus: update.status,
+      draft: update.status === 'ready' ? update.draft : row.draft,
+      draftError: update.status === 'failed' ? update.error : null,
+      draftUpdatedAt: new Date(),
+    };
+    this.items.set(id, next);
+    return this.itemView(next);
+  }
+
+  async progressByObjective(
+    org: string,
+    objectiveIds: readonly string[],
+  ): Promise<Record<string, ObjectiveProgress>> {
+    const out: Record<string, ObjectiveProgress> = {};
+    for (const w of this.items.values()) {
+      if (w.org !== org || w.objectiveId === null || !objectiveIds.includes(w.objectiveId))
+        continue;
+      const p = out[w.objectiveId] ?? { done: 0, total: 0 };
+      out[w.objectiveId] = { done: p.done + (w.status === 'done' ? 1 : 0), total: p.total + 1 };
+    }
+    return out;
   }
 
   async deleteWorkItem(org: string, id: string): Promise<boolean> {

@@ -22,4 +22,10 @@ export interface AnthropicMessagesClient {
   readonly messages: {
     create(params: Record<string, unknown>): Promise<AnthropicMessageResponse>;
   };
+  /** The beta surface, used for the server-side refusal fallback. */
+  readonly beta?: {
+    readonly messages: {
+      create(params: Record<string, unknown>): Promise<AnthropicMessageResponse>;
+    };
+  };
 }

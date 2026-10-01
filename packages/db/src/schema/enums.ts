@@ -111,3 +111,15 @@ export const sprintStatusEnum = pgEnum('sprint_status', ['planned', 'active', 'c
 export const workItemStatusEnum = pgEnum('work_item_status', ['todo', 'in_progress', 'done']);
 
 export const attachmentKindEnum = pgEnum('attachment_kind', ['link', 'file']);
+
+export const workItemOwnerEnum = pgEnum('work_item_owner', ['you', 'donna']);
+
+export const draftStatusEnum = pgEnum('draft_status', ['none', 'drafting', 'ready', 'failed']);
+
+export const planStatusEnum = pgEnum('plan_status', [
+  'drafting',
+  'proposed',
+  'approved',
+  'dismissed',
+  'failed',
+]);

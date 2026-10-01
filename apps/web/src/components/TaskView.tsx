@@ -4,6 +4,7 @@ import type { ControlPlaneClient } from '../api/client';
 import type { Navigate } from '../route';
 import type { WorkItemStatus, WorkItemView } from '../types';
 import { Attachments } from './Attachments';
+import { DonnaDraft } from './DonnaDraft';
 import {
   Check,
   Crumbs,
@@ -29,10 +30,12 @@ export function TaskView({
   client,
   id,
   navigate,
+  planner = false,
 }: {
   client: ControlPlaneClient;
   id: string;
   navigate: Navigate;
+  planner?: boolean;
 }) {
   const { data, error, setData } = useLoad(async () => {
     const detail = await client.getTask(id);
@@ -218,6 +221,15 @@ export function TaskView({
             }}
           />
         </section>
+      )}
+
+      {task.parentId === null && (
+        <DonnaDraft
+          client={client}
+          task={task}
+          planner={planner}
+          onChange={(updated) => setData((d) => (d === null ? d : { ...d, task: updated }))}
+        />
       )}
 
       <Attachments

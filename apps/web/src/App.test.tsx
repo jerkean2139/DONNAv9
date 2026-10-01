@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type ControlPlaneClient } from './api/client';
 import { App } from './App';
 import { fakeWork } from './test/fakeWork';
-import type { ObjectiveView } from './types';
+import type { ObjectiveView, PlanRecordView, PlanView } from './types';
 
 function fakeClient(overrides: Partial<ControlPlaneClient> = {}): ControlPlaneClient {
   let seq = 0;
@@ -191,5 +191,120 @@ describe('App shell', () => {
     const box = await screen.findByRole('checkbox', { name: 'Complete Ship it' });
     await user.click(box);
     expect(box).toHaveAttribute('aria-checked', 'true');
+  });
+
+  describe('Donna planning', () => {
+    const PLAN: PlanView = {
+      summary: 'I’ll run the relaunch as a two-week sprint.',
+      client: { kind: 'new', name: 'Acme Co' },
+      project: { kind: 'new', name: 'Website relaunch' },
+      sprint: { name: 'Launch sprint', startsOn: '2026-10-05', endsOn: '2026-10-16' },
+      tasks: [
+        { title: 'Draft launch email', subtasks: ['Subject', 'Body'], owner: 'donna' },
+        { title: 'Confirm DNS cutover', subtasks: [], owner: 'you' },
+      ],
+      questions: ['Which domain?'],
+    };
+
+    /** A fake API whose plan moves drafting → proposed → approved. */
+    function planningClient(initial: PlanRecordView['status'] = 'proposed') {
+      const objectives: ObjectiveView[] = [];
+      const record = (objectiveId: string, status: PlanRecordView['status']): PlanRecordView => ({
+        id: 'plan1',
+        objectiveId,
+        status,
+        plan: status === 'drafting' ? null : PLAN,
+        error: status === 'failed' ? 'declined' : null,
+        projectId: status === 'approved' ? 'p1' : null,
+      });
+      const client = fakeClient({
+        listObjectives: vi.fn(async () => objectives.map((o) => ({ ...o }))),
+        createObjective: vi.fn(async ({ requestedOutcome }: { requestedOutcome: string }) => {
+          const objective: ObjectiveView = {
+            id: 'o1',
+            requestedOutcome,
+            status: 'draft',
+            plan: null,
+          };
+          objectives.unshift(objective);
+          return { status: 'created' as const, objective };
+        }),
+        startPlan: vi.fn(async (id: string) => {
+          const plan = record(id, initial);
+          objectives[0] = { ...objectives[0]!, plan };
+          return plan;
+        }),
+        approvePlan: vi.fn(async (id: string) => {
+          const plan = record(id, 'approved');
+          objectives[0] = {
+            ...objectives[0]!,
+            status: 'active',
+            plan,
+            progress: { done: 0, total: 3 },
+          };
+          return { plan, projectId: 'p1' };
+        }),
+        dismissPlan: vi.fn(async (id: string) => record(id, 'dismissed')),
+      });
+      return client;
+    }
+
+    it('hands a typed outcome to Donna and approves her plan', async () => {
+      const user = userEvent.setup();
+      const client = planningClient();
+      render(<App client={client} planner />);
+      await screen.findByText('The agenda is clear.');
+      await user.type(screen.getByLabelText('Command Donna'), 'Relaunch the Acme site{Enter}');
+
+      expect(client.startPlan).toHaveBeenCalledWith(
+        'o1',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+      const card = await screen.findByRole('region', { name: 'Donna’s plan' });
+      expect(within(card).getByText(PLAN.summary)).toBeInTheDocument();
+      expect(
+        within(card).getByText(/Acme Co \(new\) \/ Website relaunch \(new\) \/ Launch sprint/),
+      ).toBeInTheDocument();
+      expect(within(card).getByText('I’ll draft this')).toBeInTheDocument();
+      expect(within(card).getByText('Which domain?')).toBeInTheDocument();
+
+      await user.click(within(card).getByRole('button', { name: 'Approve plan' }));
+      expect(client.approvePlan).toHaveBeenCalledWith('o1', [0, 1]);
+      expect(
+        await screen.findByText(/Planned into Acme Co \/ Website relaunch/),
+      ).toBeInTheDocument();
+      expect(screen.getByText('0/3 done')).toBeInTheDocument();
+    });
+
+    it('lets you leave tasks out before approving', async () => {
+      const user = userEvent.setup();
+      const client = planningClient();
+      render(<App client={client} planner />);
+      await screen.findByText('The agenda is clear.');
+      await user.type(screen.getByLabelText('Command Donna'), 'Relaunch{Enter}');
+      const card = await screen.findByRole('region', { name: 'Donna’s plan' });
+      await user.click(within(card).getByRole('checkbox', { name: 'Include Confirm DNS cutover' }));
+      await user.click(within(card).getByRole('button', { name: 'Approve 1 task' }));
+      expect(client.approvePlan).toHaveBeenCalledWith('o1', [0]);
+    });
+
+    it('shows drafting progress, and explains a failure with a retry', async () => {
+      const user = userEvent.setup();
+      const client = planningClient('failed');
+      render(<App client={client} planner />);
+      await screen.findByText('The agenda is clear.');
+      await user.type(screen.getByLabelText('Command Donna'), 'Something odd{Enter}');
+      expect(await screen.findByText(/tripped my safety checks/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Try again →' }));
+      expect(client.startPlan).toHaveBeenLastCalledWith('o1', expect.any(String), true);
+    });
+
+    it('says when planning is not switched on', async () => {
+      const client = planningClient();
+      render(<App client={client} planner={false} />);
+      expect(await screen.findByRole('note', { name: 'Planning' })).toHaveTextContent(
+        'ANTHROPIC_API_KEY',
+      );
+    });
   });
 });

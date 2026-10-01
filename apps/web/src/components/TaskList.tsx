@@ -54,8 +54,17 @@ export function TaskList({ client, projectId, sprintId, all, onChange, onOpen, a
                 >
                   {t.title}
                 </span>
-                {(subs.length > 0 || t.status === 'in_progress') && (
-                  <span className="mt-1 flex gap-3">
+                {(subs.length > 0 || t.status === 'in_progress' || t.owner === 'donna') && (
+                  <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    {t.owner === 'donna' && (
+                      <Kicker className="text-accent">
+                        {t.draftStatus === 'ready'
+                          ? 'Donna · draft ready'
+                          : t.draftStatus === 'drafting'
+                            ? 'Donna · writing…'
+                            : 'Donna'}
+                      </Kicker>
+                    )}
                     {t.status === 'in_progress' && (
                       <Kicker className="text-accent">In progress</Kicker>
                     )}

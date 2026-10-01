@@ -1,5 +1,7 @@
 import { detectLinkProvider, type LinkProvider } from '@donna/core-domain';
 
+import type { DraftStatus } from '@donna/core-domain';
+
 import { WorkValidationError } from './types.js';
 
 // Shared input rules, so the in-memory and Postgres services validate alike.
@@ -59,4 +61,20 @@ export function cleanFilename(name: string): string {
 export function cleanContentType(value: string): string {
   const v = value.trim().toLowerCase();
   return MIME.test(v) ? v : 'application/octet-stream';
+}
+
+/** A draft still "drafting" after this long is treated as failed (process restart, crash). */
+export const DRAFT_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** The draft status a reader should see, folding in the drafting timeout. */
+export function effectiveDraft(
+  status: DraftStatus,
+  error: string | null,
+  updatedAt: Date | null,
+  now: number = Date.now(),
+): { draftStatus: DraftStatus; draftError: string | null } {
+  if (status === 'drafting' && updatedAt !== null && now - updatedAt.getTime() > DRAFT_TIMEOUT_MS) {
+    return { draftStatus: 'failed', draftError: 'timed_out' };
+  }
+  return { draftStatus: status, draftError: error };
 }

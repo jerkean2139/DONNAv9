@@ -3,6 +3,7 @@ import type {
   AttachmentView,
   ClientView,
   ObjectiveView,
+  PlanRecordView,
   ProjectView,
   SprintView,
   WorkItemStatus,
@@ -32,10 +33,14 @@ export type CreateObjectiveResult =
   { status: 'created'; objective: ObjectiveView } | { status: 'approval_required'; reason: string };
 
 /** What `GET /client-config` returns: how this deployment authenticates. */
-export type AuthConfig =
+export type AuthConfig = (
   | { auth: 'clerk'; clerkPublishableKey: string; clerkJwtTemplate?: string }
   | { auth: 'dev'; devPrincipal: { userId: string; organizationId: string; role: string } }
-  | { auth: 'unconfigured' };
+  | { auth: 'unconfigured' }
+) & {
+  /** Whether Donna can plan and draft (a model is configured server-side). */
+  planner?: boolean;
+};
 
 /** A non-2xx API response. `code` is the API's `error` field when present. */
 export class ApiError extends Error {
@@ -253,5 +258,35 @@ export class ControlPlaneClient {
 
   deleteAttachment(id: string): Promise<void> {
     return this.request('DELETE', `/attachments/${encodeURIComponent(id)}`);
+  }
+
+  // ── Donna's planning ─────────────────────────────────────────────────────
+
+  /** Ask Donna to plan an objective. `today` is the user's local date. */
+  startPlan(objectiveId: string, today: string, retry = false): Promise<PlanRecordView> {
+    return this.request('POST', `/objectives/${encodeURIComponent(objectiveId)}/plan`, {
+      today,
+      ...(retry ? { retry: true } : {}),
+    });
+  }
+
+  approvePlan(
+    objectiveId: string,
+    tasks?: number[],
+  ): Promise<{ plan: PlanRecordView; projectId: string }> {
+    return this.request(
+      'POST',
+      `/objectives/${encodeURIComponent(objectiveId)}/plan/approve`,
+      tasks !== undefined ? { tasks } : {},
+    );
+  }
+
+  dismissPlan(objectiveId: string): Promise<PlanRecordView> {
+    return this.request('POST', `/objectives/${encodeURIComponent(objectiveId)}/plan/dismiss`, {});
+  }
+
+  /** Ask Donna to write a task's deliverable. */
+  draftTask(taskId: string): Promise<WorkItemView> {
+    return this.request('POST', `/tasks/${encodeURIComponent(taskId)}/draft`, {});
   }
 }

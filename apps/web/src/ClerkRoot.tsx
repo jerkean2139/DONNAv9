@@ -15,11 +15,12 @@ import { DonnaAvatar } from './components/DonnaAvatar';
 
 interface Props {
   publishableKey: string;
+  planner: boolean;
   /** Clerk JWT template for API tokens, when the API expects one. */
   jwtTemplate?: string;
 }
 
-function SignedInApp({ jwtTemplate }: { jwtTemplate?: string }) {
+function SignedInApp({ jwtTemplate, planner }: { jwtTemplate?: string; planner: boolean }) {
   const { getToken } = useAuth();
   // Keep the latest getToken without rebuilding the client (and refetching).
   const getTokenRef = useRef(getToken);
@@ -39,7 +40,7 @@ function SignedInApp({ jwtTemplate }: { jwtTemplate?: string }) {
     [jwtTemplate],
   );
 
-  return <App client={client} authMode="clerk" account={<UserButton />} />;
+  return <App client={client} authMode="clerk" planner={planner} account={<UserButton />} />;
 }
 
 /**
@@ -47,7 +48,7 @@ function SignedInApp({ jwtTemplate }: { jwtTemplate?: string }) {
  * and resolves the principal from DONNA's own tables (Technical Plan §6/§8).
  * Loaded lazily so development builds never pull in Clerk.
  */
-export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
+export default function ClerkRoot({ publishableKey, jwtTemplate, planner }: Props) {
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <ClerkLoading>
@@ -56,7 +57,7 @@ export default function ClerkRoot({ publishableKey, jwtTemplate }: Props) {
         </div>
       </ClerkLoading>
       <SignedIn>
-        <SignedInApp {...(jwtTemplate !== undefined ? { jwtTemplate } : {})} />
+        <SignedInApp planner={planner} {...(jwtTemplate !== undefined ? { jwtTemplate } : {})} />
       </SignedIn>
       <SignedOut>
         <div className="grain ember-wash safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-4">

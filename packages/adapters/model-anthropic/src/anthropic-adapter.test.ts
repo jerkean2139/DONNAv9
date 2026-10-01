@@ -109,3 +109,46 @@ describe('AnthropicModelAdapter.classifyError', () => {
     expect(adapter.classifyError(new Error('boom'))).toBe('unknown');
   });
 });
+
+describe('AnthropicModelAdapter structured output + refusal fallback', () => {
+  const opus55: ModelEntry = { ...model, id: 'claude-opus-5-5', displayName: 'Claude Opus 5.5' };
+
+  it('sends a JSON Schema as output_config.format alongside effort', async () => {
+    const { client, create } = fakeClient(okResponse);
+    const adapter = new AnthropicModelAdapter({ model, client, refusalFallback: false });
+    const schema = { type: 'object', properties: {}, additionalProperties: false };
+    await adapter.execute({ messages: [{ role: 'user', content: 'x' }], responseSchema: schema });
+    const params = create.mock.calls[0]![0] as Record<string, unknown>;
+    expect(params.output_config).toEqual({
+      effort: 'medium',
+      format: { type: 'json_schema', schema },
+    });
+  });
+
+  it('opts supported models into fallbacks: "default" on the beta surface', async () => {
+    const create = vi.fn();
+    const betaCreate = vi.fn().mockResolvedValue(okResponse);
+    const client: AnthropicMessagesClient = {
+      messages: { create },
+      beta: { messages: { create: betaCreate } },
+    };
+    const adapter = new AnthropicModelAdapter({ model: opus55, client });
+    const result = await adapter.execute({ messages: [{ role: 'user', content: 'x' }] });
+    expect(create).not.toHaveBeenCalled();
+    const params = betaCreate.mock.calls[0]![0] as Record<string, unknown>;
+    expect(params).toMatchObject({
+      model: 'claude-opus-5-5',
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+    });
+    expect(result.text).toBe('Hello world');
+  });
+
+  it('surfaces a refusal as finishReason "refusal"', async () => {
+    const { client } = fakeClient({ ...okResponse, content: [], stop_reason: 'refusal' });
+    const adapter = new AnthropicModelAdapter({ model, client, refusalFallback: false });
+    const result = await adapter.execute({ messages: [{ role: 'user', content: 'x' }] });
+    expect(result.finishReason).toBe('refusal');
+    expect(result.text).toBe('');
+  });
+});

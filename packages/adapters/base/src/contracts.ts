@@ -97,6 +97,13 @@ export interface ModelRequest {
   readonly maxOutputTokens?: number;
   /** 0..10 reasoning tier (Technical Plan §10); adapters map it to their controls. */
   readonly reasoningTier?: number;
+  /**
+   * Ask for a JSON response matching this JSON Schema. Adapters that support
+   * constrained decoding enforce it; the rest ignore it. Either way the caller
+   * must parse and validate `text` — the schema is a request, not a guarantee
+   * the business layer may rely on unchecked.
+   */
+  readonly responseSchema?: Readonly<Record<string, unknown>>;
 }
 
 export interface ModelUsage {
@@ -111,6 +118,11 @@ export interface ModelUsage {
 export interface ModelResult {
   readonly text: string;
   readonly usage: ModelUsage;
+  /**
+   * Why generation stopped, normalized across providers where possible:
+   * `end_turn`, `max_tokens`, `refusal` (a safety decline — `text` may be empty
+   * or partial), or a provider-specific value.
+   */
   readonly finishReason: string;
 }
 

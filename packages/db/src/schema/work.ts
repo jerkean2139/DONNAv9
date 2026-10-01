@@ -3,9 +3,11 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -13,7 +15,15 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { attachmentKindEnum, sprintStatusEnum, workItemStatusEnum } from './enums.js';
+import {
+  attachmentKindEnum,
+  draftStatusEnum,
+  planStatusEnum,
+  sprintStatusEnum,
+  workItemOwnerEnum,
+  workItemStatusEnum,
+} from './enums.js';
+import { objectives } from './execution.js';
 import { clients, organizations, projects, users } from './tenancy.js';
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -80,6 +90,14 @@ export const workItems = pgTable(
     status: workItemStatusEnum('status').notNull().default('todo'),
     dueOn: date('due_on'),
     position: integer('position').notNull().default(0),
+    // The objective this task was planned from, when Donna planned it.
+    objectiveId: uuid('objective_id').references(() => objectives.id, { onDelete: 'set null' }),
+    owner: workItemOwnerEnum('owner').notNull().default('you'),
+    // Donna's written draft for a task she owns (markdown).
+    draft: text('draft'),
+    draftStatus: draftStatusEnum('draft_status').notNull().default('none'),
+    draftError: text('draft_error'),
+    draftUpdatedAt: timestamp('draft_updated_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -88,6 +106,7 @@ export const workItems = pgTable(
     index('work_items_project_idx').on(t.organizationId, t.projectId),
     index('work_items_sprint_idx').on(t.organizationId, t.sprintId),
     index('work_items_parent_idx').on(t.organizationId, t.parentId),
+    index('work_items_objective_idx').on(t.organizationId, t.objectiveId),
     unique('work_items_org_id_unique').on(t.organizationId, t.id),
     foreignKey({
       columns: [t.organizationId, t.projectId],
@@ -108,6 +127,11 @@ export const workItems = pgTable(
       columns: [t.organizationId, t.parentId],
       foreignColumns: [t.organizationId, t.id],
       name: 'work_items_org_parent_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.objectiveId],
+      foreignColumns: [objectives.organizationId, objectives.id],
+      name: 'work_items_org_objective_fk',
     }),
   ],
 );
@@ -198,6 +222,51 @@ export const attachmentFiles = pgTable(
       columns: [t.organizationId, t.attachmentId],
       foreignColumns: [attachments.organizationId, attachments.id],
       name: 'attachment_files_org_attachment_fk',
+    }),
+  ],
+);
+
+/**
+ * Donna's plan for an objective (one per objective). Drafted by the model as
+ * structured JSON, reviewed by a person, and only materialized into the work
+ * hierarchy on approval — the human stays the decision-maker.
+ */
+export const objectivePlans = pgTable(
+  'objective_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    objectiveId: uuid('objective_id')
+      .notNull()
+      .references(() => objectives.id, { onDelete: 'cascade' }),
+    status: planStatusEnum('status').notNull().default('drafting'),
+    // The validated plan (see control-plane planning/plan.ts); null while drafting.
+    plan: jsonb('plan'),
+    error: text('error'),
+    model: text('model'),
+    costUsd: doublePrecision('cost_usd'),
+    // Where the approved plan landed.
+    projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('objective_plans_objective_unique').on(t.objectiveId),
+    unique('objective_plans_org_id_unique').on(t.organizationId, t.id),
+    index('objective_plans_org_idx').on(t.organizationId),
+    foreignKey({
+      columns: [t.organizationId, t.objectiveId],
+      foreignColumns: [objectives.organizationId, objectives.id],
+      name: 'objective_plans_org_objective_fk',
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'objective_plans_org_project_fk',
     }),
   ],
 );
