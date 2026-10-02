@@ -393,6 +393,21 @@ describe('Kitchen thread', () => {
     expect(screen.queryByLabelText('Kitchen thread')).not.toBeInTheDocument();
   });
 
+  it('switches to the agent room and expands the pane', async () => {
+    const user = userEvent.setup();
+    const client = fakeClient({ listObjectives: vi.fn().mockResolvedValue([objective]) });
+    render(<App client={client} />);
+    await user.click(await screen.findByRole('button', { name: 'In the kitchen: Ship Route 40' }));
+    const thread = await screen.findByLabelText('Kitchen thread');
+
+    await user.click(within(thread).getByRole('tab', { name: 'Agent room' }));
+    expect(within(thread).getByText(/Sample run/)).toBeInTheDocument();
+    expect(within(thread).getByLabelText('Agent conversation')).toBeInTheDocument();
+
+    await user.click(within(thread).getByRole('button', { name: 'Expand' }));
+    expect(within(thread).getByRole('button', { name: 'Full screen' })).toBeInTheDocument();
+  });
+
   it('explains a thread the API refuses', async () => {
     const user = userEvent.setup();
     const client = fakeClient({

@@ -6,6 +6,8 @@ export function DonnaAvatar({ size = 32, className = '' }: { size?: number; clas
       alt="Donna, your AI chief of staff"
       width={size}
       height={size}
+      // A fixed box, so a stretching flex row can't distort the portrait.
+      style={{ width: size, height: size }}
       className={`shrink-0 rounded-full bg-raised object-cover ring-1 ring-accent/40 ${className}`}
     />
   );
