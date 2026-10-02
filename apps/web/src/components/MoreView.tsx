@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { ControlPlaneClient } from '../api/client';
 import type { GmailStatus, NavSection } from '../types';
-import { Kicker, SectionHead, describe } from './ui';
+import { Kicker, PAGE_WIDTH, SectionHead, describe } from './ui';
 
 /** The person's Gmail connection: connect, or see which address and disconnect. */
 function GmailConnection({ client }: { client: ControlPlaneClient }) {
@@ -77,7 +77,7 @@ export function MoreView({
   gmail?: boolean;
 }) {
   return (
-    <div className="safe-x mx-auto w-full max-w-2xl pb-8 pt-4">
+    <div className={`safe-x mx-auto w-full ${PAGE_WIDTH} pb-8 pt-4`}>
       <div className="border-b border-edge pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
         Index
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { SendIcon } from './icons';
+import { PAGE_WIDTH } from './ui';
 
 export type CommandStatus =
   | { kind: 'idle' }
@@ -57,7 +58,7 @@ export function CommandBar({
       {status.kind !== 'idle' && (
         <p
           role={status.kind === 'error' ? 'alert' : 'status'}
-          className={`mx-auto mb-2 max-w-2xl animate-rise font-mono text-[11px] uppercase tracking-[0.12em] ${
+          className={`mx-auto mb-2 ${PAGE_WIDTH} animate-rise font-mono text-[11px] uppercase tracking-[0.12em] ${
             status.kind === 'error' ? 'text-danger' : 'text-accent'
           }`}
         >
@@ -65,7 +66,7 @@ export function CommandBar({
         </p>
       )}
       <div
-        className={`mx-auto flex max-w-2xl items-center gap-2 rounded-[22px] py-1.5 pl-5 pr-1.5 transition-colors ${
+        className={`mx-auto flex ${PAGE_WIDTH} items-center gap-2 rounded-[22px] py-1.5 pl-5 pr-1.5 transition-colors ${
           disabled ? 'bg-raised' : 'bg-ink shadow-[0_18px_40px_-18px_rgba(255,91,46,0.45)]'
         }`}
       >

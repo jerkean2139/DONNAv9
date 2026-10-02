@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  EventEnvelope,
   Objective,
   ObjectiveId,
   OrganizationId,
@@ -41,6 +42,12 @@ export interface ObjectiveService {
    * landed in. Tenant-scoped; returns null for another tenant's objective.
    */
   activate(id: string, organizationId: string, projectId: string): Promise<Objective | null>;
+  /**
+   * The recorded activity for one objective, oldest first: every event tied to
+   * it (its own and its tasks'). Tenant-scoped like `get`; the caller checks the
+   * objective's read policy before returning these.
+   */
+  events(objectiveId: string, organizationId: string, limit: number): Promise<EventEnvelope[]>;
 }
 
 /**
@@ -53,8 +60,15 @@ export class InMemoryObjectiveService implements ObjectiveService {
   // The domain Objective carries no org id, so track tenancy alongside it to
   // enforce scoped reads the same way the Drizzle query does.
   private readonly store = new Map<string, { objective: Objective; organizationId: string }>();
+  // Every event published on the bus (including the task dispatcher's),
+  // standing in for the `events` table.
+  private readonly recorded: EventEnvelope[] = [];
 
-  constructor(private readonly bus: EventBus) {}
+  constructor(private readonly bus: EventBus) {
+    bus.subscribe('*', (event) => {
+      this.recorded.push(event);
+    });
+  }
 
   async create(input: CreateObjectiveInput, principal: PrincipalContext): Promise<Objective> {
     const id = randomUUID() as ObjectiveId;
@@ -113,5 +127,23 @@ export class InMemoryObjectiveService implements ObjectiveService {
     };
     this.store.set(id, { objective, organizationId });
     return objective;
+  }
+
+  async events(
+    objectiveId: string,
+    organizationId: string,
+    limit: number,
+  ): Promise<EventEnvelope[]> {
+    // Same rule as the Drizzle query: the objective's own events plus those of
+    // its tasks, which workers record by task id alone.
+    const inOrg = this.recorded.filter((e) => e.organizationId === organizationId);
+    const taskIds = new Set(
+      inOrg.filter((e) => e.objectiveId === objectiveId && e.taskId).map((e) => e.taskId),
+    );
+    return inOrg
+      .filter(
+        (e) => e.objectiveId === objectiveId || (e.taskId !== undefined && taskIds.has(e.taskId)),
+      )
+      .slice(0, limit);
   }
 }

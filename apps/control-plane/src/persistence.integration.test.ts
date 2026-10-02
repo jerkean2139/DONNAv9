@@ -242,6 +242,41 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect((payloads[0]!.payload as { taskId: string }).taskId).toBe(task.id);
   });
 
+  it('lists an objective activity oldest first, tenant-scoped', async () => {
+    const principal = await seedTenant(db);
+    const other = await seedTenant(db);
+    const svc = new DrizzleObjectiveService(db);
+    const objective = await svc.create(
+      { requestedOutcome: 'x', definitionOfDone: 'y', scope: 'ORGANIZATION', riskLevel: 'low' },
+      principal,
+    );
+    const { task } = await new DrizzleTaskDispatcher(db).dispatch(
+      { objectiveId: objective.id, goal: 'g', definitionOfDone: 'd', requiredCapabilities: [] },
+      principal,
+    );
+
+    // A worker-written event carries the task id but no objective id.
+    await db.insert(schema.events).values({
+      organizationId: principal.organizationId,
+      taskId: task.id,
+      type: 'task.blocked',
+      actorType: 'orchestrator',
+      actorId: 'worker',
+      correlationId: randomUUID(),
+    });
+
+    const events = await svc.events(objective.id, principal.organizationId, 50);
+    expect(events.map((e) => e.type)).toEqual([
+      'objective.created',
+      'task.created',
+      'task.blocked',
+    ]);
+    expect(events[0]!.actor).toEqual({ type: 'human', id: principal.userId });
+    expect(events[1]!.taskId).toBe(task.id);
+    expect(events[0]!.createdAt).toBeInstanceOf(Date);
+    expect(await svc.events(objective.id, other.organizationId, 50)).toEqual([]);
+  });
+
   // SEC-3b: composite (organization_id, id) foreign keys reject a row that
   // points at a parent in a DIFFERENT organization — defense-in-depth beneath
   // the policy engine. The single-column FK alone would accept these (the
