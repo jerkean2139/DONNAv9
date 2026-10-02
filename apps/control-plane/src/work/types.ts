@@ -172,10 +172,14 @@ export interface WorkService {
   getClient(org: string, id: string): Promise<ClientView | null>;
   createClient(org: string, input: CreateClientInput): Promise<ClientView>;
   updateClient(org: string, id: string, input: UpdateClientInput): Promise<ClientView | null>;
+  /** Deletes a client and its attachments; its projects stay, with no client. */
+  deleteClient(org: string, id: string): Promise<boolean>;
 
   listProjects(org: string, filter?: { clientId?: string }): Promise<ProjectView[]>;
   getProject(org: string, id: string): Promise<ProjectView | null>;
   createProject(org: string, input: CreateProjectInput): Promise<ProjectView>;
+  /** Deletes a project and (by cascade) its sprints, tasks, subtasks and attachments. */
+  deleteProject(org: string, id: string): Promise<boolean>;
 
   listSprints(org: string, projectId: string): Promise<SprintView[]>;
   getSprint(org: string, id: string): Promise<SprintView | null>;

@@ -212,6 +212,8 @@ const ERROR_TEXT: Record<string, string> = {
   file_too_large: 'Files can be up to 10 MB.',
   empty_file: 'That file is empty.',
   forbidden: 'You don’t have permission to do that.',
+  admin_required: 'Only an admin can load or remove the demo.',
+  demo_already_seeded: 'The demo client is already loaded.',
 };
 
 /** Plain-language text for an API failure. */
