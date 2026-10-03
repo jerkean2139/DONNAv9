@@ -443,6 +443,22 @@ export class DrizzleWorkService implements WorkService {
     return out;
   }
 
+  async deleteProject(org: string, id: string): Promise<boolean> {
+    const deleted = await this.db
+      .delete(projects)
+      .where(and(eq(projects.id, id), eq(projects.organizationId, org)))
+      .returning({ id: projects.id });
+    return deleted.length > 0;
+  }
+
+  async deleteClient(org: string, id: string): Promise<boolean> {
+    const deleted = await this.db
+      .delete(clients)
+      .where(and(eq(clients.id, id), eq(clients.organizationId, org)))
+      .returning({ id: clients.id });
+    return deleted.length > 0;
+  }
+
   async deleteWorkItem(org: string, id: string): Promise<boolean> {
     const deleted = await this.db
       .delete(workItems)

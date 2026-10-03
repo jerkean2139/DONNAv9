@@ -16,6 +16,7 @@ import { registerEmailRoutes } from './email/routes.js';
 import type { GmailService } from './email/gmail-service.js';
 import { registerPlanRoutes } from './planning/routes.js';
 import { registerWorkRoutes } from './work/routes.js';
+import { registerDemoRoutes } from './demo/routes.js';
 import type { WorkService } from './work/types.js';
 
 export interface ServerDeps {
@@ -166,6 +167,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   if (deps.work !== undefined) {
     registerWorkRoutes(app, { work: deps.work, authenticate: deps.authenticate });
+    registerDemoRoutes(app, { work: deps.work, authenticate: deps.authenticate });
     if (deps.planning !== undefined) {
       registerPlanRoutes(app, {
         planning: deps.planning,

@@ -171,6 +171,16 @@ export class ControlPlaneClient {
     return (res.status === 204 ? undefined : await res.json()) as T;
   }
 
+  /** Load the fictional demo client into your organization (admins only). */
+  loadDemo(): Promise<{ seeded: Record<string, number> }> {
+    return this.request('POST', '/demo');
+  }
+
+  /** Remove the demo client and everything under it (admins only). */
+  removeDemo(): Promise<{ removedClients: number }> {
+    return this.request('DELETE', '/demo');
+  }
+
   async listClients(): Promise<ClientView[]> {
     return (await this.request<{ clients: ClientView[] }>('GET', '/clients')).clients;
   }

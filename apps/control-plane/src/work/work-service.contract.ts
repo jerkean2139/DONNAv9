@@ -220,6 +220,39 @@ export function describeWorkServiceContract(
       expect(await f.work.getAttachment(f.org, link.id)).toBeNull();
     });
 
+    it('deleting a project removes its sprints, tasks, subtasks and attachments', async () => {
+      const f = await setup();
+      const { client, project, sprint, task } = await tree(f);
+      const sub = await f.work.createWorkItem(
+        f.org,
+        { projectId: project.id, title: 'Sub', parentId: task.id },
+        f.userId,
+      );
+      const link = await f.work.createLink(
+        f.org,
+        { type: 'sprint', id: sprint.id },
+        { url: 'https://example.com' },
+        f.userId,
+      );
+      expect(await f.work.deleteProject(f.otherOrg, project.id)).toBe(false);
+      expect(await f.work.deleteProject(f.org, project.id)).toBe(true);
+      expect(await f.work.getProject(f.org, project.id)).toBeNull();
+      expect(await f.work.getSprint(f.org, sprint.id)).toBeNull();
+      expect(await f.work.getWorkItem(f.org, task.id)).toBeNull();
+      expect(await f.work.getWorkItem(f.org, sub.id)).toBeNull();
+      expect(await f.work.getAttachment(f.org, link.id)).toBeNull();
+      expect(await f.work.getClient(f.org, client.id)).not.toBeNull();
+    });
+
+    it('deleting a client keeps its projects, unassigned', async () => {
+      const f = await setup();
+      const { client, project } = await tree(f);
+      expect(await f.work.deleteClient(f.otherOrg, client.id)).toBe(false);
+      expect(await f.work.deleteClient(f.org, client.id)).toBe(true);
+      expect(await f.work.getClient(f.org, client.id)).toBeNull();
+      expect((await f.work.getProject(f.org, project.id))?.clientId).toBeNull();
+    });
+
     it('never crosses the tenant boundary', async () => {
       const f = await setup();
       const { client, project, task } = await tree(f);

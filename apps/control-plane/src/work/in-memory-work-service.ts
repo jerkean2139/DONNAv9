@@ -357,6 +357,45 @@ export class InMemoryWorkService implements WorkService {
     return out;
   }
 
+  private dropAttachments(match: (target: AttachmentRef) => boolean): void {
+    for (const a of [...this.attachments.values()]) {
+      if (match(a.target)) {
+        this.attachments.delete(a.id);
+        this.files.delete(a.id);
+      }
+    }
+  }
+
+  async deleteProject(org: string, id: string): Promise<boolean> {
+    if (this.owned(this.projects, org, id) === null) return false;
+    const sprintIds = new Set(
+      [...this.sprints.values()].filter((s) => s.projectId === id).map((s) => s.id),
+    );
+    const itemIds = new Set(
+      [...this.items.values()].filter((w) => w.projectId === id).map((w) => w.id),
+    );
+    this.dropAttachments(
+      (t) =>
+        (t.type === 'project' && t.id === id) ||
+        (t.type === 'sprint' && sprintIds.has(t.id)) ||
+        (t.type === 'task' && itemIds.has(t.id)),
+    );
+    for (const s of sprintIds) this.sprints.delete(s);
+    for (const w of itemIds) this.items.delete(w);
+    this.projects.delete(id);
+    return true;
+  }
+
+  async deleteClient(org: string, id: string): Promise<boolean> {
+    if (this.owned(this.clients, org, id) === null) return false;
+    this.dropAttachments((t) => t.type === 'client' && t.id === id);
+    for (const p of this.projects.values()) {
+      if (p.clientId === id) this.projects.set(p.id, { ...p, clientId: null });
+    }
+    this.clients.delete(id);
+    return true;
+  }
+
   async deleteWorkItem(org: string, id: string): Promise<boolean> {
     const row = this.owned(this.items, org, id);
     if (row === null) return false;
