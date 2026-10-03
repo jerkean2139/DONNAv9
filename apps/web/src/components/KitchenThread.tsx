@@ -1,4 +1,8 @@
+import { useState } from 'react';
+
+import { SAMPLE_AGENT_RUN } from '../data/sampleAgentRun';
 import type { ActivityEventView, ObjectiveView, PlanRecordView } from '../types';
+import { AgentRoom } from './AgentRoom';
 import { DonnaAvatar } from './DonnaAvatar';
 import { Kicker } from './ui';
 
@@ -147,7 +151,25 @@ function Message({ line }: { line: Line }) {
  * Donna planned, and each step she and her workers recorded, in order. Built
  * from real records only, so it never shows work that didn't happen.
  */
+type Size = 'pane' | 'half' | 'full';
+
+// Width on laptops and desktops. Phones always get the full screen.
+const SIZE_CLASS: Record<Size, string> = {
+  pane: 'lg:static lg:z-10 lg:w-[min(42vw,560px)]',
+  half: 'lg:static lg:z-10 lg:w-1/2',
+  full: 'lg:fixed lg:inset-0 lg:z-50 lg:w-auto',
+};
+const NEXT_SIZE: Record<Size, { size: Size; label: string }> = {
+  pane: { size: 'half', label: 'Expand' },
+  half: { size: 'full', label: 'Full screen' },
+  full: { size: 'pane', label: 'Shrink' },
+};
+
+type Tab = 'recorded' | 'agents';
+
 export function KitchenThread({ objective, state, onClose }: Props) {
+  const [size, setSize] = useState<Size>('pane');
+  const [tab, setTab] = useState<Tab>('recorded');
   let lines: Line[] = [];
   if (state.kind === 'ready') {
     lines = state.events.map((e) => eventLine(e, objective.requestedOutcome));
@@ -161,46 +183,86 @@ export function KitchenThread({ objective, state, onClose }: Props) {
   return (
     <aside
       aria-label="Kitchen thread"
-      className="fixed inset-0 z-40 flex flex-col bg-surface lg:static lg:z-10 lg:w-[min(42vw,560px)] lg:shrink-0 lg:border-l lg:border-edge lg:bg-panel/60"
+      className={`fixed inset-0 z-40 flex flex-col bg-surface lg:shrink-0 lg:border-l lg:border-edge ${
+        size === 'full' ? 'lg:bg-surface' : 'lg:bg-panel/60'
+      } ${SIZE_CLASS[size]}`}
     >
       <header className="safe-top shrink-0 border-b border-edge px-5 pb-3 pt-4 lg:px-6 lg:pt-7">
         <div className="flex items-center justify-between gap-3">
           <Kicker className="text-accent">In the kitchen</Kicker>
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint hover:text-ink"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setSize(NEXT_SIZE[size].size)}
+              className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-faint hover:text-ink lg:inline"
+            >
+              {NEXT_SIZE[size].label}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint hover:text-ink"
+            >
+              Close
+            </button>
+          </div>
         </div>
         <p className="mt-2 font-serif text-[22px] leading-tight text-ink">
           {objective.requestedOutcome}
         </p>
+        <div role="tablist" aria-label="Kitchen views" className="mt-3 flex gap-5">
+          {(
+            [
+              ['recorded', 'Recorded steps'],
+              ['agents', 'Agent room'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`border-b pb-1 font-mono text-[10px] uppercase tracking-[0.16em] ${
+                tab === key
+                  ? 'border-accent text-ink'
+                  : 'border-transparent text-faint hover:text-muted'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 lg:px-6">
-        {state.kind === 'loading' ? (
-          <p className="font-serif text-[17px] italic text-muted">Pulling up the thread…</p>
-        ) : state.kind === 'error' ? (
-          <p role="alert" className="text-[14px] text-danger">
-            {state.message}
-          </p>
-        ) : lines.length === 0 ? (
-          <p className="font-serif text-[17px] italic text-muted">Nothing recorded here yet.</p>
-        ) : (
-          <ol className="space-y-5" aria-label="Thread messages">
-            {lines.map((l) => (
-              <Message key={l.key} line={l} />
-            ))}
-          </ol>
-        )}
-      </div>
+      {tab === 'agents' ? (
+        <AgentRoom run={SAMPLE_AGENT_RUN} sample />
+      ) : (
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 lg:px-6">
+            {state.kind === 'loading' ? (
+              <p className="font-serif text-[17px] italic text-muted">Pulling up the thread…</p>
+            ) : state.kind === 'error' ? (
+              <p role="alert" className="text-[14px] text-danger">
+                {state.message}
+              </p>
+            ) : lines.length === 0 ? (
+              <p className="font-serif text-[17px] italic text-muted">Nothing recorded here yet.</p>
+            ) : (
+              <ol className="space-y-5" aria-label="Thread messages">
+                {lines.map((l) => (
+                  <Message key={l.key} line={l} />
+                ))}
+              </ol>
+            )}
+          </div>
 
-      <footer className="safe-bottom shrink-0 border-t border-edge px-5 py-3 text-[11px] leading-snug text-faint lg:px-6">
-        Specialist agents arrive with the Agent Factory. Until then, this shows each step Donna and
-        her workers record.
-      </footer>
+          <footer className="safe-bottom shrink-0 border-t border-edge px-5 py-3 text-[11px] leading-snug text-faint lg:px-6">
+            Specialist agents arrive with the Agent Factory. Until then, this shows each step Donna
+            and her workers record.
+          </footer>
+        </>
+      )}
     </aside>
   );
 }
