@@ -48,6 +48,7 @@ import { DrizzleWorkService } from './work/drizzle-work-service.js';
 import { InMemoryWorkService } from './work/in-memory-work-service.js';
 import type { WorkService } from './work/types.js';
 import { DrizzleProvisioningService } from './webhooks/provisioning.js';
+import { DrizzleIntegrationInbox } from './integrations/inbox.js';
 
 /**
  * Build the request authenticator (Technical Plan §6/§8). Production always
@@ -183,6 +184,16 @@ if (config.databaseUrl !== undefined) {
     planStore: new DrizzlePlanStore(db),
     connectionStore: new DrizzleConnectionStore(db),
     emailStore: new DrizzleEmailStore(db),
+    ...(() => {
+      const secret = process.env['DONNA_PM_INTEGRATION_SECRET'];
+      if (!secret) return {};
+      return {
+        integrations: {
+          inbox: new DrizzleIntegrationInbox(db),
+          sources: [{ key: process.env['DONNA_PM_SOURCE_KEY'] || 'kobteamllm', secret }],
+        },
+      };
+    })(),
     // In production the signing secret is required, so the provisioning webhook
     // is always wired; in development it is wired only when the secret is set.
     ...(config.webhookSecret !== undefined

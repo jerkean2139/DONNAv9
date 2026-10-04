@@ -24,11 +24,14 @@ export const integrationSources = pgTable(
       .references(() => organizations.id, { onDelete: 'cascade' }),
     key: text('key').notNull(),
     name: text('name').notNull(),
+    /** Stable organization identifier used by the external source (e.g. KOBTEAMLLM integer org id). */
+    externalOrganizationId: text('external_organization_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     unique('integration_sources_org_key_unique').on(t.organizationId, t.key),
+    unique('integration_sources_key_external_org_unique').on(t.key, t.externalOrganizationId),
     unique('integration_sources_org_id_unique').on(t.organizationId, t.id),
   ],
 );
