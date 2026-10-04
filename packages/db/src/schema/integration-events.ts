@@ -110,3 +110,38 @@ export const integrationInbox = pgTable(
     }),
   ],
 );
+
+
+/**
+ * Durable reconciliation cursor per source/entity. The cursor is opaque to Donna;
+ * only the source system interprets it.
+ */
+export const integrationReconciliationCursors = pgTable(
+  'integration_reconciliation_cursors',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => integrationSources.id, { onDelete: 'cascade' }),
+    entityType: text('entity_type').notNull(),
+    cursor: text('cursor').notNull(),
+    reconciledAt: timestamp('reconciled_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('integration_reconciliation_cursor_unique').on(
+      t.organizationId,
+      t.sourceId,
+      t.entityType,
+    ),
+    foreignKey({
+      columns: [t.organizationId, t.sourceId],
+      foreignColumns: [integrationSources.organizationId, integrationSources.id],
+      name: 'integration_reconciliation_cursor_org_source_fk',
+    }),
+  ],
+);
