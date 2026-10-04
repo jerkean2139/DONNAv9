@@ -26,7 +26,10 @@ function setup() {
   const bus = new InMemoryEventBus();
   const app = buildServer({
     objectiveService: new InMemoryObjectiveService(bus),
-    taskDispatcher: new InMemoryTaskDispatcher(new InMemoryTaskService(bus), new InMemoryWorkQueue()),
+    taskDispatcher: new InMemoryTaskDispatcher(
+      new InMemoryTaskService(bus),
+      new InMemoryWorkQueue(),
+    ),
     authenticate: devAuthenticator(),
     integrations: { inbox, sources: [{ key: 'kobteamllm', secret: 'secret' }] },
   });

@@ -682,5 +682,4 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
       }),
     ).rejects.toThrow();
   });
-
 });

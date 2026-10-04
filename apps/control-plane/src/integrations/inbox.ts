@@ -12,7 +12,10 @@ export interface IntegrationSourceConfig {
 }
 
 export interface IntegrationInbox {
-  resolveSource(sourceKey: string, externalOrganizationId: string): Promise<{
+  resolveSource(
+    sourceKey: string,
+    externalOrganizationId: string,
+  ): Promise<{
     readonly id: string;
     readonly organizationId: string;
   } | null>;
