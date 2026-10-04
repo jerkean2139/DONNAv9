@@ -14,6 +14,8 @@ import type { TaskDispatcher } from './services/task-dispatcher.js';
 import type { PlanService } from './planning/plan-service.js';
 import { registerEmailRoutes } from './email/routes.js';
 import type { GmailService } from './email/gmail-service.js';
+import type { IntegrationInbox, IntegrationSourceConfig } from './integrations/inbox.js';
+import { registerIntegrationRoutes } from './integrations/routes.js';
 import { registerPlanRoutes } from './planning/routes.js';
 import { registerWorkRoutes } from './work/routes.js';
 import { registerDemoRoutes } from './demo/routes.js';
@@ -66,6 +68,11 @@ export interface ServerDeps {
    * `work`. When present, its routes are registered.
    */
   readonly gmail?: GmailService;
+  /** Governed service-to-service operational event receiver. */
+  readonly integrations?: {
+    readonly inbox: IntegrationInbox;
+    readonly sources: readonly IntegrationSourceConfig[];
+  };
 }
 
 export type ClientConfig =
@@ -147,7 +154,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // The Clerk webhook must verify the Svix signature over the RAW body, so keep
   // it alongside the parsed JSON. Only installed when the webhook is configured,
   // so other deployments keep Fastify's default parser untouched.
-  if (deps.clerkWebhook !== undefined) {
+  if (deps.clerkWebhook !== undefined || deps.integrations !== undefined) {
     app.removeContentTypeParser('application/json');
     app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
       (req as { rawBody?: string }).rawBody = body as string;
@@ -164,6 +171,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   }
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  if (deps.integrations !== undefined) {
+    registerIntegrationRoutes(app, deps.integrations);
+  }
 
   if (deps.work !== undefined) {
     registerWorkRoutes(app, { work: deps.work, authenticate: deps.authenticate });
