@@ -3,8 +3,10 @@ on:
   push:
     branches:
       - ci/prettier-oracle
+permissions:
+  contents: write
 jobs:
-  diff:
+  format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +18,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Show exact Prettier diff
+      - name: Apply exact Prettier output
+        run: pnpm exec prettier --write apps/control-plane/src/integrations/signature.ts packages/db/src/schema/integration-events.ts
+      - name: Commit formatted files
         run: |
-          pnpm exec prettier --write apps/control-plane/src/integrations/signature.ts packages/db/src/schema/integration-events.ts
-          git diff -- apps/control-plane/src/integrations/signature.ts packages/db/src/schema/integration-events.ts
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/control-plane/src/integrations/signature.ts packages/db/src/schema/integration-events.ts
+          git commit -m "style: apply exact prettier output"
+          git push
