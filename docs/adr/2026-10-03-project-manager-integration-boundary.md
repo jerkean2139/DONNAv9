@@ -69,6 +69,7 @@ The systems use different IDs and should never assume IDs match. Add an integrat
 ### 5. Operational event vocabulary
 
 V9's event system is strong but its canonical event types currently focus on objectives/orchestrator tasks. Extend it for PM work events such as:
+
 - client/project/sprint created or updated
 - work_item created/updated/moved/completed/blocked
 - assignment changed
