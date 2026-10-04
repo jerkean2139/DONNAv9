@@ -56,15 +56,20 @@ export class ProjectManagerReconciler {
     return imported;
   }
 
-  private async runEntity(source: ReconciliationSource, entityType: ReconciliationEntityType): Promise<number> {
+  private async runEntity(
+    source: ReconciliationSource,
+    entityType: ReconciliationEntityType,
+  ): Promise<number> {
     const [stored] = await this.db
       .select({ cursor: schema.integrationReconciliationCursors.cursor })
       .from(schema.integrationReconciliationCursors)
-      .where(and(
-        eq(schema.integrationReconciliationCursors.organizationId, source.organizationId),
-        eq(schema.integrationReconciliationCursors.sourceId, source.id),
-        eq(schema.integrationReconciliationCursors.entityType, entityType),
-      ))
+      .where(
+        and(
+          eq(schema.integrationReconciliationCursors.organizationId, source.organizationId),
+          eq(schema.integrationReconciliationCursors.sourceId, source.id),
+          eq(schema.integrationReconciliationCursors.entityType, entityType),
+        ),
+      )
       .limit(1);
 
     let cursor = stored?.cursor;
@@ -86,7 +91,9 @@ export class ProjectManagerReconciler {
         },
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok) throw new Error(`PM reconciliation failed: HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`PM reconciliation failed: HTTP ${response.status}`);
+      }
       const page = (await response.json()) as ChangePage;
       if (
         page.schema_version !== '1' ||
@@ -94,43 +101,51 @@ export class ProjectManagerReconciler {
         page.entity_type !== entityType ||
         !Array.isArray(page.items) ||
         typeof page.next_cursor !== 'string'
-      ) throw new Error('PM reconciliation returned an invalid page');
+      ) {
+        throw new Error('PM reconciliation returned an invalid page');
+      }
 
       for (const item of page.items) {
         const externalId = String(item.id);
-        await this.db.insert(schema.integrationIdentityMap).values({
-          organizationId: source.organizationId,
-          sourceId: source.id,
-          entityType,
-          externalId,
-        }).onConflictDoUpdate({
-          target: [
-            schema.integrationIdentityMap.organizationId,
-            schema.integrationIdentityMap.sourceId,
-            schema.integrationIdentityMap.entityType,
-            schema.integrationIdentityMap.externalId,
-          ],
-          set: { updatedAt: new Date() },
-        });
+        await this.db
+          .insert(schema.integrationIdentityMap)
+          .values({
+            organizationId: source.organizationId,
+            sourceId: source.id,
+            entityType,
+            externalId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              schema.integrationIdentityMap.organizationId,
+              schema.integrationIdentityMap.sourceId,
+              schema.integrationIdentityMap.entityType,
+              schema.integrationIdentityMap.externalId,
+            ],
+            set: { updatedAt: new Date() },
+          });
         imported += 1;
       }
 
       cursor = page.next_cursor;
-      await this.db.insert(schema.integrationReconciliationCursors).values({
-        organizationId: source.organizationId,
-        sourceId: source.id,
-        entityType,
-        cursor,
-        reconciledAt: new Date(),
-        updatedAt: new Date(),
-      }).onConflictDoUpdate({
-        target: [
-          schema.integrationReconciliationCursors.organizationId,
-          schema.integrationReconciliationCursors.sourceId,
-          schema.integrationReconciliationCursors.entityType,
-        ],
-        set: { cursor, reconciledAt: new Date(), updatedAt: new Date() },
-      });
+      await this.db
+        .insert(schema.integrationReconciliationCursors)
+        .values({
+          organizationId: source.organizationId,
+          sourceId: source.id,
+          entityType,
+          cursor,
+          reconciledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [
+            schema.integrationReconciliationCursors.organizationId,
+            schema.integrationReconciliationCursors.sourceId,
+            schema.integrationReconciliationCursors.entityType,
+          ],
+          set: { cursor, reconciledAt: new Date(), updatedAt: new Date() },
+        });
 
       if (!page.has_more) return imported;
     }
