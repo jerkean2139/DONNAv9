@@ -16,6 +16,10 @@ import { DrizzleOutboxBus } from './outbox-bus.js';
 import { DrizzleOutboxStore } from './outbox-store.js';
 import { BufferingEventBus, TaskStateStore } from './task-state.js';
 import { parseWorkOrder } from './work-order-payload.js';
+import {
+  ProjectManagerReconciler,
+  PROJECT_MANAGER_RECONCILIATION_TASK,
+} from './project-manager-reconciliation.js';
 
 export interface WorkerConfig {
   readonly connectionString: string;
@@ -40,6 +44,12 @@ export interface WorkerConfig {
    * `capabilityCatalog` is given; the catalog is the preferred wiring.
    */
   readonly workRegistry?: CapabilityRegistry;
+  /** Project Manager reconciliation. Omit to keep the scheduled job dormant. */
+  readonly projectManager?: {
+    readonly baseUrl: string;
+    readonly secret: string;
+    readonly sourceKey?: string;
+  };
 }
 
 /**
@@ -69,6 +79,10 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
   const taskState = new TaskStateStore(db);
   // Fallback outbox for ad-hoc orders that carry no durable task row.
   const outboxBus = new DrizzleOutboxBus(db);
+  const projectManager = config.projectManager;
+  const reconciler = projectManager
+    ? new ProjectManagerReconciler(db, projectManager.baseUrl, projectManager.secret)
+    : undefined;
 
   // Orchestrator dependencies (the composition root). The orchestrator stays
   // provider-agnostic: vendors are bound only in the resolvers, and its events
@@ -91,11 +105,22 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
     // graphile-worker installs and manages its own schema/tables.
     // Cron granularity is one minute; a lower-latency transport replaces this
     // cadence when the production event bus lands.
-    crontab: '* * * * * dispatch-outbox',
+    crontab: [
+      '* * * * * dispatch-outbox',
+      ...(reconciler !== undefined ? [`*/5 * * * * ${PROJECT_MANAGER_RECONCILIATION_TASK}`] : []),
+    ].join('\n'),
     taskList: {
       'dispatch-outbox': async () => {
         await dispatcher.dispatchBatch(batchSize);
       },
+      ...(reconciler !== undefined
+        ? {
+            [PROJECT_MANAGER_RECONCILIATION_TASK]: async () => {
+              const imported = await reconciler.runAll(projectManager?.sourceKey ?? 'kobteamllm');
+              console.info(`[project-manager-reconciliation] imported=${imported}`);
+            },
+          }
+        : {}),
       [EXECUTE_WORK_ORDER_TASK]: async (payload) => {
         const order = parseWorkOrder(payload);
         // Buffer the orchestrator's execution trace so it can be committed

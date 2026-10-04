@@ -16,9 +16,26 @@ if (connectionString === undefined || connectionString === '') {
 // Bind non-AI capability adapters (e.g. GoHighLevel CRM) from the environment.
 const capabilityCatalog = buildCapabilityCatalog();
 
+const pmBaseUrl = process.env.DONNA_PM_BASE_URL;
+const pmSecret = process.env.DONNA_PM_INTEGRATION_SECRET;
+const projectManager =
+  pmBaseUrl && pmSecret
+    ? {
+        baseUrl: pmBaseUrl,
+        secret: pmSecret,
+        sourceKey: process.env.DONNA_PM_SOURCE_KEY || 'kobteamllm',
+      }
+    : undefined;
+if ((pmBaseUrl && !pmSecret) || (!pmBaseUrl && pmSecret)) {
+  console.warn(
+    'Project Manager reconciliation disabled: DONNA_PM_BASE_URL and DONNA_PM_INTEGRATION_SECRET must both be set.',
+  );
+}
+
 const runner = await runWorker({
   connectionString,
   ...(capabilityCatalog !== undefined ? { capabilityCatalog } : {}),
+  ...(projectManager !== undefined ? { projectManager } : {}),
 });
 
 // Liveness endpoint. The worker has no HTTP API, but a platform healthcheck
