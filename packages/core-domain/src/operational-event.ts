@@ -13,7 +13,7 @@ export const OPERATIONAL_EVENT_TYPES = [
 
 export type OperationalEventType = (typeof OPERATIONAL_EVENT_TYPES)[number];
 
-export const OPERATIONAL_ENTITY_TYPES = ['client', 'project', 'sprint', 'task', 'assignment'] as const;
+export const OPERATIONAL_ENTITY_TYPES = [\n  'client',\n  'project',\n  'sprint',\n  'task',\n  'assignment',\n] as const;
 
 export type OperationalEntityType = (typeof OPERATIONAL_ENTITY_TYPES)[number];
 
