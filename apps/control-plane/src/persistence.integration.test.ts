@@ -636,4 +636,51 @@ describe.skipIf(!TEST_DATABASE_URL)('control-plane persistence (integration)', (
     expect(after[0]!.n).toBe(before[0]!.n);
     expect(jobsAfter[0]!.n).toBe(jobsBefore[0]!.n);
   });
+  it('deduplicates PM integration events and rejects cross-tenant source rows', async () => {
+    const orgA = await seedTenant(db);
+    const orgB = await seedTenant(db);
+    const [source] = await db
+      .insert(schema.integrationSources)
+      .values({
+        organizationId: orgA.organizationId,
+        key: 'kobteamllm',
+        name: 'KOB Team LLM',
+        externalOrganizationId: '7',
+      })
+      .returning();
+
+    const values = {
+      organizationId: orgA.organizationId,
+      sourceId: source!.id,
+      eventId: randomUUID(),
+      schemaVersion: '1',
+      eventType: 'task.updated',
+      entityType: 'task',
+      externalEntityId: '42',
+      correlationId: randomUUID(),
+      occurredAt: new Date(),
+      payload: { status: 'in_progress' },
+    };
+    const first = await db
+      .insert(schema.integrationInbox)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({ id: schema.integrationInbox.id });
+    const duplicate = await db
+      .insert(schema.integrationInbox)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({ id: schema.integrationInbox.id });
+    expect(first).toHaveLength(1);
+    expect(duplicate).toHaveLength(0);
+
+    await expect(
+      db.insert(schema.integrationInbox).values({
+        ...values,
+        eventId: randomUUID(),
+        organizationId: orgB.organizationId,
+      }),
+    ).rejects.toThrow();
+  });
+
 });
