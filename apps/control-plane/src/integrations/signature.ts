@@ -29,7 +29,6 @@ export function verifyIntegrationSignature(input: {
   const expectedBuffer = Buffer.from(expected);
   const actualBuffer = Buffer.from(actual);
   return (
-    expectedBuffer.length === actualBuffer.length &&
-    timingSafeEqual(expectedBuffer, actualBuffer)
+    expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer)
   );
 }
