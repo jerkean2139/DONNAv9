@@ -111,7 +111,6 @@ export const integrationInbox = pgTable(
   ],
 );
 
-
 /**
  * Durable reconciliation cursor per source/entity. The cursor is opaque to Donna;
  * only the source system interprets it.
