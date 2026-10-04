@@ -11,6 +11,7 @@ export * from './roles.js';
 export * from './source-confidence.js';
 export * from './authority.js';
 export * from './event.js';
+export * from './operational-event.js';
 export * from './objective.js';
 export * from './task.js';
 export * from './task-state-machine.js';

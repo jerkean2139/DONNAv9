@@ -78,6 +78,13 @@
       "when": 1790817208862,
       "tag": "0010_gmail_connections_and_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791073200000,
+      "tag": "0011_integration_event_inbox",
+      "breakpoints": true
     }
   ]
 }
