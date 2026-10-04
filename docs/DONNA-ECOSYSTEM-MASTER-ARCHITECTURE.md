@@ -8,11 +8,11 @@
 
 Do not merge these repositories simply because features overlap. The overlap is evidence that shared capabilities need clear ownership.
 
-| System | Primary responsibility | Audience | Authority |
-| --- | --- | --- | --- |
-| Jeremy-OS | Jeremy's personal cockpit | Jeremy | Personal state, personal workflow, personal interface |
-| KOBTEAMLLM | Team and client operations | Team, PMs, eventually clients | Operational work system of record |
-| DONNA V9 | Intelligence, orchestration, governance and integration layer | Both applications and governed agents | Cross-system reasoning, events, approvals, agents and integration contracts |
+| System     | Primary responsibility                                        | Audience                              | Authority                                                                   |
+| ---------- | ------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
+| Jeremy-OS  | Jeremy's personal cockpit                                     | Jeremy                                | Personal state, personal workflow, personal interface                       |
+| KOBTEAMLLM | Team and client operations                                    | Team, PMs, eventually clients         | Operational work system of record                                           |
+| DONNA V9   | Intelligence, orchestration, governance and integration layer | Both applications and governed agents | Cross-system reasoning, events, approvals, agents and integration contracts |
 
 ## Canonical work hierarchy
 
@@ -24,29 +24,29 @@ DONNA V9 already has a compatible relational hierarchy. That compatibility is fo
 
 ## Ownership matrix
 
-| Capability | Jeremy-OS | KOBTEAMLLM | DONNA V9 | Direction |
-| --- | --- | --- | --- | --- |
-| Personal Donna chat | OWNER | No | Shared intelligence | Keep Jeremy-OS UI; route governed intelligence through V9 over time |
-| Chat topic/session log | OWNER | No | Memory consumer | Preserve PR #125 pattern; make session boundaries available to V9 |
-| Personal daily planning/focus | OWNER | No | Assist | Keep personal UX in Jeremy-OS |
-| Personal inbox/mail UX | OWNER | No | Governed service/agent | Keep cockpit; progressively centralize reusable Gmail capability in V9 |
-| Personal calendar UX | OWNER | Team calendar may exist | Governed integration | Jeremy-OS remains personal interface |
-| Voice/ElevenLabs/transcription | OWNER UI | Has voice features | Orchestration may consume transcripts | Avoid three independent voice stacks; share contracts/providers later |
-| Fathom | OWNER UX today | No clear authority | Future integration service | Move reusable ingestion/knowledge capability toward V9 |
-| GHL | Personal/quick actions today | Operational use possible | OWNER reusable adapter | V9 already has a GHL adapter; converge here |
-| Basecamp | Temporary integration | PM replaces its operational role | Observe only | Retire after PM parity/migration |
-| Slack | Temporary personal/team integration | Has rich chat + Slack sync | Event/intelligence consumer | Replace only after native communication parity |
-| Clients/projects/sprints/tasks/subtasks | Consume/query | OWNER | Mirror/index/orchestrate | PM is source of truth until explicit consolidation |
-| Kanban/workflow | No | OWNER | Observe/command via API | Do not duplicate workflow authority |
-| Recurring work/templates | Personal routines only | OWNER operational templates | Orchestrate/instantiate | PM owns templates initially |
-| Team assignment | No | OWNER | Query/command | V9 needs identity mapping before write authority |
-| Team chat/threads/files | No | OWNER/native replacement target | Search/summarize/govern | KOBTEAMLLM already has substantial Slack-like UI |
-| Time tracking/daily closeout | Personal focus telemetry | OWNER team operations | Analyze | Preserve PM implementation |
-| Approvals/governance | Confirm cards | Operational QA | OWNER policy/governance | Standardize approval contracts in V9 |
-| Disposable agents | No | Agent-builder overlap | OWNER | V9 Agent Factory is canonical agent execution direction |
-| Business Graph/context | Personal context | Operational data | OWNER cross-system graph | V9 links people, clients, work, objectives and evidence |
-| Notifications | Personal push | Team notifications | Policy/event routing | Keep presentation local; centralize event intent later |
-| Cross-system Daily Brief | OWNER presentation | Data source | OWNER synthesis | Jeremy-OS presents Jeremy's brief; V9 assembles business context |
+| Capability                              | Jeremy-OS                           | KOBTEAMLLM                       | DONNA V9                              | Direction                                                              |
+| --------------------------------------- | ----------------------------------- | -------------------------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| Personal Donna chat                     | OWNER                               | No                               | Shared intelligence                   | Keep Jeremy-OS UI; route governed intelligence through V9 over time    |
+| Chat topic/session log                  | OWNER                               | No                               | Memory consumer                       | Preserve PR #125 pattern; make session boundaries available to V9      |
+| Personal daily planning/focus           | OWNER                               | No                               | Assist                                | Keep personal UX in Jeremy-OS                                          |
+| Personal inbox/mail UX                  | OWNER                               | No                               | Governed service/agent                | Keep cockpit; progressively centralize reusable Gmail capability in V9 |
+| Personal calendar UX                    | OWNER                               | Team calendar may exist          | Governed integration                  | Jeremy-OS remains personal interface                                   |
+| Voice/ElevenLabs/transcription          | OWNER UI                            | Has voice features               | Orchestration may consume transcripts | Avoid three independent voice stacks; share contracts/providers later  |
+| Fathom                                  | OWNER UX today                      | No clear authority               | Future integration service            | Move reusable ingestion/knowledge capability toward V9                 |
+| GHL                                     | Personal/quick actions today        | Operational use possible         | OWNER reusable adapter                | V9 already has a GHL adapter; converge here                            |
+| Basecamp                                | Temporary integration               | PM replaces its operational role | Observe only                          | Retire after PM parity/migration                                       |
+| Slack                                   | Temporary personal/team integration | Has rich chat + Slack sync       | Event/intelligence consumer           | Replace only after native communication parity                         |
+| Clients/projects/sprints/tasks/subtasks | Consume/query                       | OWNER                            | Mirror/index/orchestrate              | PM is source of truth until explicit consolidation                     |
+| Kanban/workflow                         | No                                  | OWNER                            | Observe/command via API               | Do not duplicate workflow authority                                    |
+| Recurring work/templates                | Personal routines only              | OWNER operational templates      | Orchestrate/instantiate               | PM owns templates initially                                            |
+| Team assignment                         | No                                  | OWNER                            | Query/command                         | V9 needs identity mapping before write authority                       |
+| Team chat/threads/files                 | No                                  | OWNER/native replacement target  | Search/summarize/govern               | KOBTEAMLLM already has substantial Slack-like UI                       |
+| Time tracking/daily closeout            | Personal focus telemetry            | OWNER team operations            | Analyze                               | Preserve PM implementation                                             |
+| Approvals/governance                    | Confirm cards                       | Operational QA                   | OWNER policy/governance               | Standardize approval contracts in V9                                   |
+| Disposable agents                       | No                                  | Agent-builder overlap            | OWNER                                 | V9 Agent Factory is canonical agent execution direction                |
+| Business Graph/context                  | Personal context                    | Operational data                 | OWNER cross-system graph              | V9 links people, clients, work, objectives and evidence                |
+| Notifications                           | Personal push                       | Team notifications               | Policy/event routing                  | Keep presentation local; centralize event intent later                 |
+| Cross-system Daily Brief                | OWNER presentation                  | Data source                      | OWNER synthesis                       | Jeremy-OS presents Jeremy's brief; V9 assembles business context       |
 
 ## Important overlap findings
 
