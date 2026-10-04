@@ -16,7 +16,10 @@ import { DrizzleOutboxBus } from './outbox-bus.js';
 import { DrizzleOutboxStore } from './outbox-store.js';
 import { BufferingEventBus, TaskStateStore } from './task-state.js';
 import { parseWorkOrder } from './work-order-payload.js';
-import { ProjectManagerReconciler, PROJECT_MANAGER_RECONCILIATION_TASK } from './project-manager-reconciliation.js';
+import {
+  ProjectManagerReconciler,
+  PROJECT_MANAGER_RECONCILIATION_TASK,
+} from './project-manager-reconciliation.js';
 
 export interface WorkerConfig {
   readonly connectionString: string;
