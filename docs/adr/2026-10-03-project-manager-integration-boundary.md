@@ -51,18 +51,23 @@ These capabilities must not be lost by prematurely making V9 the system of recor
 ## Gaps to close before V9 can replace the PM
 
 ### 1. Team assignment model
+
 V9 work_items currently use a small owner enum (human/Donna-style ownership). The PM supports actual team-user assignment and multiple assignees. V9 needs explicit user/team assignment relations before it can replace PM task ownership.
 
 ### 2. Workflow/Kanban statuses
+
 V9 currently has a deliberately small work-item state set. The PM has a richer operational workflow. The integration contract must define canonical statuses and a lossless mapping. Do not silently collapse PM states such as blocked, review, waiting, or approval into todo/in_progress/done.
 
 ### 3. Recurrence and templates
+
 V9 has sprints but no first-class recurring sprint/project template model. Add this deliberately rather than hard-coding recurring tasks. The target must support monthly Visibility/website/SEO/AEO/GEO/analytics work by instantiating a versioned template into a dated sprint.
 
 ### 4. External identity mapping
+
 The systems use different IDs and should never assume IDs match. Add an integration identity map keyed by organization, source system, entity type and external ID. This enables safe retries, reconciliation and eventual migration.
 
 ### 5. Operational event vocabulary
+
 V9's event system is strong but its canonical event types currently focus on objectives/orchestrator tasks. Extend it for PM work events such as:
 - client/project/sprint created or updated
 - work_item created/updated/moved/completed/blocked
@@ -74,25 +79,31 @@ V9's event system is strong but its canonical event types currently focus on obj
 Event payloads should remain referenced rather than leaking sensitive/large bodies into the event envelope.
 
 ### 6. Webhook inbox + idempotency
+
 Add a durable inbound webhook/event inbox to Donna. Every incoming PM event must carry event_id, source, organization, occurred_at and schema_version. Store/dedupe before processing. Delivery is at-least-once, so consumers must be idempotent.
 
 ### 7. Reconciliation
+
 Webhooks are the fast path, not the only truth. Add a low-frequency reconciliation endpoint/job that compares changed records since a cursor/watermark and repairs missed events without LLM use.
 
 ### 8. Authentication
+
 Use service-to-service credentials stored in Railway secrets. Sign webhook bodies (HMAC or equivalent), include timestamp/nonce protection, rotate secrets, and reject cross-organization identifiers. Never expose the internal service credential to the browser.
 
 ## Proposed integration contract
 
 ### PM → Donna events
+
 POST /internal/integrations/project-manager/v1/events
 
 Headers:
+
 - X-Donna-Source
 - X-Donna-Timestamp
 - X-Donna-Signature
 
 Envelope:
+
 - event_id
 - schema_version
 - event_type
@@ -106,6 +117,7 @@ Envelope:
 Donna verifies, deduplicates, persists, acknowledges quickly, and processes asynchronously.
 
 ### Donna → PM commands
+
 Use narrow authenticated command endpoints rather than direct database writes. Examples:
 
 - create/update sprint
