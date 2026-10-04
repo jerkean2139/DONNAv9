@@ -1,13 +1,4 @@
-import {
-  foreignKey,
-  index,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { organizations } from './tenancy.js';
 
@@ -97,11 +88,7 @@ export const integrationInbox = pgTable(
     error: text('error'),
   },
   (t) => [
-    unique('integration_inbox_source_event_unique').on(
-      t.organizationId,
-      t.sourceId,
-      t.eventId,
-    ),
+    unique('integration_inbox_source_event_unique').on(t.organizationId, t.sourceId, t.eventId),
     index('integration_inbox_pending_idx').on(t.organizationId, t.processedAt),
     index('integration_inbox_entity_idx').on(
       t.organizationId,
