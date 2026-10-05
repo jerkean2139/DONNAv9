@@ -23,6 +23,8 @@ export interface UsageRecord extends TokenUsage {
   readonly objectiveId?: string;
   readonly routePolicyVersion?: string;
   readonly tokenProvenance?: TokenCountProvenance;
+  readonly cacheWriteTokens?: number;
+  readonly reasoningTokens?: number;
   readonly retries?: number;
   readonly fallbackDepth?: number;
   readonly success?: boolean;
