@@ -1,0 +1,41 @@
+name: Temporary exact Prettier fix
+
+on:
+  push:
+    branches:
+      - fix/prettier-exact-output
+
+permissions:
+  contents: write
+
+jobs:
+  format-roadmap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/prettier-exact-output
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run repository-pinned Prettier
+        run: pnpm exec prettier docs/DONNA-AI-INFRASTRUCTURE-MVP-V2-ROADMAP.md --write
+      - name: Verify exact formatting
+        run: pnpm exec prettier docs/DONNA-AI-INFRASTRUCTURE-MVP-V2-ROADMAP.md --check
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet -- docs/DONNA-AI-INFRASTRUCTURE-MVP-V2-ROADMAP.md; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/DONNA-AI-INFRASTRUCTURE-MVP-V2-ROADMAP.md
+          git commit -m "fix: apply exact repository Prettier output"
+          git push
