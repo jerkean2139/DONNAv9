@@ -244,6 +244,9 @@ export async function executeWorkOrder(
         latencyMs: result.usage.latencyMs,
         routePolicyVersion: 'baseline-v1',
         tokenProvenance: 'PROVIDER_REPORTED',
+        ...(result.usage.reasoningTokens !== undefined
+          ? { reasoningTokens: result.usage.reasoningTokens }
+          : {}),
         ...(result.usage.cachedInputTokens !== undefined
           ? { cachedInputTokens: result.usage.cachedInputTokens }
           : {}),
