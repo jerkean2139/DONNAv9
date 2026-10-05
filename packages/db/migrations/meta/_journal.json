@@ -99,6 +99,13 @@
       "when": 1791118800000,
       "tag": "0013_integration_reconciliation_cursors",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791230400000,
+      "tag": "0014_ai_baseline_telemetry",
+      "breakpoints": true
     }
   ]
 }

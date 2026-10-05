@@ -39,6 +39,8 @@ import {
   workItemStatusEnum,
 } from './schema/enums.js';
 import {
+  aiRoutingDecisions,
+  aiUsageEvents,
   approvals,
   auditEvents,
   delegations,
@@ -103,6 +105,8 @@ describe('control-plane tables are defined and org-scoped', () => {
     idempotencyKeys,
     googleConnections,
     outboundEmails,
+    aiUsageEvents,
+    aiRoutingDecisions,
   ];
 
   it('every business-state table carries organization_id', () => {
@@ -132,6 +136,37 @@ describe('control-plane tables are defined and org-scoped', () => {
       'checkpoint',
     ]) {
       expect(tasks).toHaveProperty(col);
+    }
+  });
+});
+
+describe('AI-0 baseline telemetry contracts', () => {
+  it('usage events carry economics and token provenance', () => {
+    for (const col of [
+      'provider',
+      'modelId',
+      'inputTokens',
+      'cachedInputTokens',
+      'outputTokens',
+      'tokenProvenance',
+      'actualCostUsd',
+      'latencyMs',
+      'routePolicyVersion',
+    ]) {
+      expect(aiUsageEvents).toHaveProperty(col);
+    }
+  });
+
+  it('routing decisions are tenant-scoped and policy-versioned', () => {
+    for (const col of [
+      'organizationId',
+      'routePolicyVersion',
+      'dataClassification',
+      'candidates',
+      'selectedRoute',
+      'reason',
+    ]) {
+      expect(aiRoutingDecisions).toHaveProperty(col);
     }
   });
 });
