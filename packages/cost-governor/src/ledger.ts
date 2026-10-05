@@ -6,16 +6,34 @@ import type { TokenUsage } from './cost.js';
  * frontier (Build Bible V2-012). In-memory here; the persistent ledger is backed
  * by the DB `usage_ledger` / `model_evaluation` tables.
  */
+export type TokenCountProvenance =
+  | 'PROVIDER_REPORTED'
+  | 'TOKENIZER_CALCULATED'
+  | 'HEURISTIC_ESTIMATE'
+  | 'HARDCODED_ESTIMATE'
+  | 'UNKNOWN';
+
 export interface UsageRecord extends TokenUsage {
+  readonly organizationId?: string;
   readonly modelId: string;
   readonly provider: string;
   readonly costUsd: number;
   readonly latencyMs: number;
   readonly taskId?: string;
   readonly objectiveId?: string;
+  readonly routePolicyVersion?: string;
+  readonly tokenProvenance?: TokenCountProvenance;
+  readonly retries?: number;
+  readonly fallbackDepth?: number;
+  readonly success?: boolean;
+  readonly failureClass?: string;
 }
 
-export class UsageLedger {
+export interface UsageRecorder {
+  record(entry: UsageRecord): void | Promise<void>;
+}
+
+export class UsageLedger implements UsageRecorder {
   private readonly records: UsageRecord[] = [];
 
   record(entry: UsageRecord): void {
