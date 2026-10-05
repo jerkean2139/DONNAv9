@@ -122,13 +122,16 @@ export async function executeWorkOrder(
         const usage = adapter.reportUsage();
         // Capability spend lands in the same ledger, keyed by capability id (no
         // tokens — deterministic/automation work is not model-metered).
-        deps.ledger.record({
+        await deps.ledger.record({
+          organizationId: order.organizationId,
           modelId: candidate.id,
           provider: 'capability',
           inputTokens: 0,
           outputTokens: 0,
           costUsd: usage?.costUsd ?? 0,
           latencyMs: usage?.latencyMs ?? 0,
+          routePolicyVersion: 'baseline-v1',
+          tokenProvenance: 'UNKNOWN',
           ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
         });
         await emit('task.completed');
@@ -231,13 +234,16 @@ export async function executeWorkOrder(
     await emit('tool.called');
     try {
       const result = await adapter.execute(modelRequest, {});
-      deps.ledger.record({
+      await deps.ledger.record({
+        organizationId: order.organizationId,
         modelId: entry.id,
         provider: entry.provider,
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
         costUsd: result.usage.costUsd,
         latencyMs: result.usage.latencyMs,
+        routePolicyVersion: 'baseline-v1',
+        tokenProvenance: 'PROVIDER_REPORTED',
         ...(result.usage.cachedInputTokens !== undefined
           ? { cachedInputTokens: result.usage.cachedInputTokens }
           : {}),
