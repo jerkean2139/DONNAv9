@@ -1,6 +1,6 @@
 import type { CapabilityAdapter, ModelAdapter, ModelRequest } from '@donna/adapter-base';
 import type { ModelEntry } from '@donna/config';
-import type { Budget, UsageLedger } from '@donna/cost-governor';
+import type { Budget, UsageRecorder } from '@donna/cost-governor';
 import type { Actor, ExecutionClass } from '@donna/core-domain';
 import type { EventBus } from '@donna/events';
 import type { ActionDescriptor, PrincipalContext, ResourceDescriptor } from '@donna/policy';
@@ -74,7 +74,7 @@ export interface OrchestratorDeps {
   readonly bus: EventBus;
   readonly workRegistry: CapabilityRegistry;
   readonly modelRegistry: readonly ModelEntry[];
-  readonly ledger: UsageLedger;
+  readonly ledger: UsageRecorder;
   /** Resolve a bound ModelAdapter for a model id (composition root wires vendors). */
   readonly resolveModelAdapter: (modelId: string) => ModelAdapter | undefined;
   /**
