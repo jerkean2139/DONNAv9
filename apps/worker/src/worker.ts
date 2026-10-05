@@ -1,5 +1,4 @@
 import { MODEL_REGISTRY } from '@donna/config';
-import { UsageLedger } from '@donna/cost-governor';
 import { createDatabase } from '@donna/db';
 import { InMemoryEventBus, OutboxDispatcher, type EventBus } from '@donna/events';
 import {
@@ -16,6 +15,7 @@ import { DrizzleOutboxBus } from './outbox-bus.js';
 import { DrizzleOutboxStore } from './outbox-store.js';
 import { BufferingEventBus, TaskStateStore } from './task-state.js';
 import { parseWorkOrder } from './work-order-payload.js';
+import { DrizzleUsageRecorder } from './usage-recorder.js';
 import {
   ProjectManagerReconciler,
   PROJECT_MANAGER_RECONCILIATION_TASK,
@@ -94,7 +94,7 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
     bus: new DrizzleOutboxBus(db),
     workRegistry: catalog?.toWorkRegistry() ?? config.workRegistry ?? new CapabilityRegistry(),
     modelRegistry: MODEL_REGISTRY,
-    ledger: new UsageLedger(),
+    ledger: new DrizzleUsageRecorder(db),
     resolveModelAdapter: createModelAdapterResolver(MODEL_REGISTRY),
     ...(catalog !== undefined ? { resolveCapabilityAdapter: catalog.resolver() } : {}),
   };
