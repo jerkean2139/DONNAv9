@@ -1,8 +1,11 @@
 # DONNA V9 — AI Infrastructure MVP + V2 Roadmap
 
-**Status:** FROZEN MVP DIRECTION — implementation audit baseline  
-**Date:** 2026-10-05  
-**Repository baseline:** `a830ec9f7297a52d682ccd689d4c596f34d367d1`  
+**Status:** FROZEN MVP DIRECTION — implementation audit baseline
+
+**Date:** 2026-10-05
+
+**Repository baseline:** `a830ec9f7297a52d682ccd689d4c596f34d367d1`
+
 **Purpose:** Define the minimum AI compute/routing foundation for DONNA V9, identify what already exists, separate MVP from V2, and prevent duplicate infrastructure.
 
 ## 1. Objective
@@ -87,6 +90,7 @@ DONNA / KOBTEAMLLM / JEREMY-OS / CLIENT PORTALS
 ### Stage 1 — existing hardware, MVP
 
 **Ubuntu 8 GB microcomputer — AI Control Plane 01**
+
 - always-on gateway/control-plane candidate
 - routing and policy
 - cache coordination
@@ -96,20 +100,24 @@ DONNA / KOBTEAMLLM / JEREMY-OS / CLIENT PORTALS
 - lightweight inference only where benchmarks support it
 
 **Jeremy desktop GPU — AI Worker 01**
+
 - local OpenAI-compatible inference endpoint
 - larger local models based on actual GPU/VRAM
 - may be offline without breaking DONNA
 - health/availability determines router eligibility
 
 **Railway**
+
 - remains application/database/worker production platform
 - no migration away from Railway is part of this MVP
 
 **Cloud APIs**
+
 - escalation tier, not default tier
 - Anthropic/OpenAI remain available for work where frontier quality earns its cost
 
 ### Stage 2 — V2 burst compute
+
 - rented GPU providers, including evaluation of Hostinger GPU and specialist GPU clouds
 - automatic economics comparison
 - automatic start/stop only after safe provider controls and measured demand exist
@@ -419,6 +427,7 @@ Minimum views:
 ## 12. Implementation sequence
 
 ### Sprint AI-0 — Baseline + contracts
+
 - refresh model registry from verified provider data
 - define durable ledger + decision receipt schema
 - define token provenance
@@ -429,6 +438,7 @@ Minimum views:
 **Gate:** baseline telemetry is trustworthy.
 
 ### Sprint AI-1 — Maximum Logic Router
+
 - extend existing router rather than replace it
 - deterministic-first eligibility
 - quality/risk/privacy/health/cost/latency inputs
@@ -438,6 +448,7 @@ Minimum views:
 **Gate:** Golden deterministic routing tests pass.
 
 ### Sprint AI-2 — Local compute
+
 - configure Ubuntu control-plane role
 - register desktop GPU worker
 - local OpenAI-compatible endpoint
@@ -448,6 +459,7 @@ Minimum views:
 **Gate:** desktop can disappear mid-day without breaking DONNA.
 
 ### Sprint AI-3 — Context + cache
+
 - extend Context Packet into Context Compiler
 - provider prompt caching
 - local prefix caching
@@ -458,6 +470,7 @@ Minimum views:
 **Gate:** no cross-tenant cache reuse; token accounting reconciles.
 
 ### Sprint AI-4 — Auditor + Golden Suite
+
 - build representative dataset
 - scoring rubrics
 - bounded shadow routing
@@ -468,6 +481,7 @@ Minimum views:
 **Gate:** auditor can identify deliberately bad routing policies.
 
 ### Sprint AI-5 — Economics dashboard + Donna integration
+
 - dashboard
 - baseline vs optimized
 - user/team/project attribution
