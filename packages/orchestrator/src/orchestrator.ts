@@ -130,7 +130,7 @@ export async function executeWorkOrder(
           outputTokens: 0,
           costUsd: usage?.costUsd ?? 0,
           latencyMs: usage?.latencyMs ?? 0,
-          routePolicyVersion: 'baseline-v1',
+          routePolicyVersion,
           tokenProvenance: 'UNKNOWN',
           ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
         });
@@ -190,6 +190,8 @@ export async function executeWorkOrder(
     };
   }
   const modelRequest = order.modelRequest;
+  const routePolicyVersion = order.routePolicyVersion ?? 'baseline-v1';
+  const dataClassification = order.dataClassification ?? 'INTERNAL';
 
   const decision = routeModel(
     {
@@ -211,6 +213,20 @@ export async function executeWorkOrder(
   }
 
   const chain: readonly ModelEntry[] = [decision.model, ...decision.fallbacks];
+
+  await deps.routingDecisions?.record({
+    organizationId: order.organizationId,
+    ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
+    ...(order.correlationId !== undefined ? { correlationId: order.correlationId } : {}),
+    routePolicyVersion,
+    reasoningTier: order.reasoningTier ?? 5,
+    dataClassification,
+    candidates: chain.map((entry) => entry.id),
+    selectedRoute: executionClass,
+    selectedModelId: decision.model.id,
+    reason: decision.reason,
+    fallbackDepth: 0,
+  });
   let lastErrorClass: string | undefined;
 
   for (const entry of chain) {
@@ -242,7 +258,7 @@ export async function executeWorkOrder(
         outputTokens: result.usage.outputTokens,
         costUsd: result.usage.costUsd,
         latencyMs: result.usage.latencyMs,
-        routePolicyVersion: 'baseline-v1',
+        routePolicyVersion,
         tokenProvenance: 'PROVIDER_REPORTED',
         ...(result.usage.reasoningTokens !== undefined
           ? { reasoningTokens: result.usage.reasoningTokens }
