@@ -1,0 +1,38 @@
+name: Temporary exact Prettier AI-1 router
+
+on:
+  push:
+    branches:
+      - feat/ai-1-maximum-logic-router-core
+
+permissions:
+  contents: write
+
+jobs:
+  format-router:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ai-1-maximum-logic-router-core
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run exact repository Prettier
+        run: pnpm exec prettier packages/model-router/src/router.ts packages/model-router/src/router.test.ts --write
+      - name: Verify formatting
+        run: pnpm exec prettier packages/model-router/src/router.ts packages/model-router/src/router.test.ts --check
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet -- packages/model-router/src/router.ts packages/model-router/src/router.test.ts; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/model-router/src/router.ts packages/model-router/src/router.test.ts
+          git commit -m "fix: apply exact Prettier output to AI-1 router"
+          git push
