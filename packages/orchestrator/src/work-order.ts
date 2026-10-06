@@ -28,6 +28,10 @@ export interface WorkOrder {
   readonly requireLocal?: boolean;
   readonly minContextTokens?: number;
   readonly modelRequest?: ModelRequest;
+  /** Hard routing input. Defaults to INTERNAL when omitted. */
+  readonly dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
+  /** Versioned routing policy for attribution and safe canarying. */
+  readonly routePolicyVersion?: string;
 
   /** Payload handed to a non-AI capability adapter's `execute` (§7.4). */
   readonly capabilityInput?: unknown;
@@ -75,6 +79,8 @@ export interface OrchestratorDeps {
   readonly workRegistry: CapabilityRegistry;
   readonly modelRegistry: readonly ModelEntry[];
   readonly ledger: UsageRecorder;
+  /** Durable audit sink for every AI model-routing decision. */
+  readonly routingDecisions?: RoutingDecisionRecorder;
   /** Resolve a bound ModelAdapter for a model id (composition root wires vendors). */
   readonly resolveModelAdapter: (modelId: string) => ModelAdapter | undefined;
   /**
@@ -82,4 +88,23 @@ export interface OrchestratorDeps {
    * Optional: when absent, non-AI classes park as `blocked` (no adapter wired).
    */
   readonly resolveCapabilityAdapter?: (capabilityId: string) => CapabilityAdapter | undefined;
+}
+
+
+export interface RoutingDecisionRecord {
+  readonly organizationId: string;
+  readonly taskId?: string;
+  readonly correlationId?: string;
+  readonly routePolicyVersion: string;
+  readonly reasoningTier: number;
+  readonly dataClassification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
+  readonly candidates: readonly string[];
+  readonly selectedRoute: string;
+  readonly selectedModelId?: string;
+  readonly reason: string;
+  readonly fallbackDepth: number;
+}
+
+export interface RoutingDecisionRecorder {
+  record(entry: RoutingDecisionRecord): void | Promise<void>;
 }
