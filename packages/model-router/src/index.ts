@@ -7,3 +7,4 @@
  * fallback chain. Reads the model registry from `@donna/config`; no SDKs.
  */
 export * from './router.js';
+export * from './policy.js';
