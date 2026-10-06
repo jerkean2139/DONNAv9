@@ -145,6 +145,37 @@ describe('executeWorkOrder — AI path', () => {
     expect(events).toContain('task.completed');
   });
 
+  it('records a routing decision receipt with privacy and policy attribution', async () => {
+    const receipts: import('./work-order.js').RoutingDecisionRecord[] = [];
+    const { deps } = makeDeps({
+      routingDecisions: { record: (entry) => { receipts.push(entry); } },
+    });
+    const result = await executeWorkOrder(
+      {
+        ...aiOrder,
+        correlationId: '11111111-1111-4111-8111-111111111111',
+        dataClassification: 'CONFIDENTIAL',
+        routePolicyVersion: 'baseline-test-v1',
+      },
+      deps,
+    );
+
+    expect(result.status).toBe('completed');
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({
+      organizationId: 'org1',
+      taskId: 'task1',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+      routePolicyVersion: 'baseline-test-v1',
+      reasoningTier: 5,
+      dataClassification: 'CONFIDENTIAL',
+      selectedRoute: 'cloud_ai',
+      selectedModelId: 'claude-sonnet-5',
+      fallbackDepth: 0,
+    });
+    expect(receipts[0]?.candidates).toEqual(['claude-sonnet-5']);
+  });
+
   it('fails when the AI order carries no model request', async () => {
     const { deps } = makeDeps();
     const result = await executeWorkOrder({ ...aiOrder, modelRequest: undefined }, deps);
