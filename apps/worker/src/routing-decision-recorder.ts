@@ -12,19 +12,22 @@ export class DrizzleRoutingDecisionRecorder implements RoutingDecisionRecorder {
   constructor(private readonly db: DonnaDatabase) {}
 
   async record(entry: RoutingDecisionRecord): Promise<string> {
-    const [row] = await this.db.insert(schema.aiRoutingDecisions).values({
-      organizationId: entry.organizationId,
-      ...(entry.taskId !== undefined ? { taskId: entry.taskId } : {}),
-      ...(entry.correlationId !== undefined ? { correlationId: entry.correlationId } : {}),
-      routePolicyVersion: entry.routePolicyVersion,
-      reasoningTier: entry.reasoningTier,
-      dataClassification: entry.dataClassification,
-      candidates: entry.candidates,
-      selectedRoute: entry.selectedRoute,
-      ...(entry.selectedModelId !== undefined ? { selectedModelId: entry.selectedModelId } : {}),
-      reason: entry.reason,
-      fallbackDepth: entry.fallbackDepth,
-    }).returning({ id: schema.aiRoutingDecisions.id });
+    const [row] = await this.db
+      .insert(schema.aiRoutingDecisions)
+      .values({
+        organizationId: entry.organizationId,
+        ...(entry.taskId !== undefined ? { taskId: entry.taskId } : {}),
+        ...(entry.correlationId !== undefined ? { correlationId: entry.correlationId } : {}),
+        routePolicyVersion: entry.routePolicyVersion,
+        reasoningTier: entry.reasoningTier,
+        dataClassification: entry.dataClassification,
+        candidates: entry.candidates,
+        selectedRoute: entry.selectedRoute,
+        ...(entry.selectedModelId !== undefined ? { selectedModelId: entry.selectedModelId } : {}),
+        reason: entry.reason,
+        fallbackDepth: entry.fallbackDepth,
+      })
+      .returning({ id: schema.aiRoutingDecisions.id });
 
     if (row === undefined) throw new Error('routing_decision_receipt_not_created');
     return row.id;
