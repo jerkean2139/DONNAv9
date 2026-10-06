@@ -123,40 +123,43 @@ DONNA / KOBTEAMLLM / JEREMY-OS / CLIENT PORTALS
 - automatic start/stop only after safe provider controls and measured demand exist
 
 ### Stage 3 — V2 owned GPU expansion
+
 Purchase only after telemetry proves sustained utilization and break-even. Do not select hardware from parameter counts alone.
 
 ## 4. Repository-verified foundation already present
 
 The following are **KEEP / EXTEND**, not rebuild:
 
-| Capability | Repository evidence | Status |
-|---|---|---|
-| Work Router above Model Router | `packages/work-router`, architecture docs | EXISTS |
-| Model Router | `packages/model-router/src/router.ts` | EXISTS / EXTEND |
-| Model registry | `packages/config/src/models.ts` | EXISTS / REFRESH |
-| Anthropic adapter | `packages/adapters/model-anthropic` | EXISTS |
-| OpenAI adapter | `packages/adapters/model-openai` | EXISTS |
-| Local OpenAI-compatible adapter | `packages/adapters/model-local` | EXISTS |
-| Context Packet budgeting | `packages/context/src/packet.ts` | EXISTS / EXTEND |
-| Cost governor primitives | `packages/cost-governor` | EXISTS / EXTEND |
-| Budget checking | `packages/cost-governor/src/budget.ts` | EXISTS / EXTEND |
-| Usage/evaluation types | `packages/cost-governor/src/ledger.ts` | EXISTS / MAKE DURABLE |
-| Adapter health contract | `packages/adapters/base/src/contracts.ts` | EXISTS / EXTEND |
-| Structured response schema contract | adapter base `ModelRequest.responseSchema` | EXISTS / ENFORCE |
-| Risk model | objective/task schema | EXISTS |
-| Approval/audit model | governance schema | EXISTS / WIRE FULLY |
-| Multi-tenant DB protections | DB schema + baseline report | EXISTS |
-| Feature flags | governance schema | EXISTS |
-| Worker/orchestrator architecture | `apps/worker`, `packages/orchestrator` | EXISTS |
-| Event/outbox architecture | `packages/events`, DB schema | EXISTS |
-| KOB PM integration foundation | control-plane integrations + worker reconciliation | EXISTS |
+| Capability                          | Repository evidence                                | Status                |
+| ----------------------------------- | -------------------------------------------------- | --------------------- |
+| Work Router above Model Router      | `packages/work-router`, architecture docs          | EXISTS                |
+| Model Router                        | `packages/model-router/src/router.ts`              | EXISTS / EXTEND       |
+| Model registry                      | `packages/config/src/models.ts`                    | EXISTS / REFRESH      |
+| Anthropic adapter                   | `packages/adapters/model-anthropic`                | EXISTS                |
+| OpenAI adapter                      | `packages/adapters/model-openai`                   | EXISTS                |
+| Local OpenAI-compatible adapter     | `packages/adapters/model-local`                    | EXISTS                |
+| Context Packet budgeting            | `packages/context/src/packet.ts`                   | EXISTS / EXTEND       |
+| Cost governor primitives            | `packages/cost-governor`                           | EXISTS / EXTEND       |
+| Budget checking                     | `packages/cost-governor/src/budget.ts`             | EXISTS / EXTEND       |
+| Usage/evaluation types              | `packages/cost-governor/src/ledger.ts`             | EXISTS / MAKE DURABLE |
+| Adapter health contract             | `packages/adapters/base/src/contracts.ts`          | EXISTS / EXTEND       |
+| Structured response schema contract | adapter base `ModelRequest.responseSchema`         | EXISTS / ENFORCE      |
+| Risk model                          | objective/task schema                              | EXISTS                |
+| Approval/audit model                | governance schema                                  | EXISTS / WIRE FULLY   |
+| Multi-tenant DB protections         | DB schema + baseline report                        | EXISTS                |
+| Feature flags                       | governance schema                                  | EXISTS                |
+| Worker/orchestrator architecture    | `apps/worker`, `packages/orchestrator`             | EXISTS                |
+| Event/outbox architecture           | `packages/events`, DB schema                       | EXISTS                |
+| KOB PM integration foundation       | control-plane integrations + worker reconciliation | EXISTS                |
 
 ## 5. Critical gaps found in this audit
 
 ### GAP A — Router objective is too narrow
+
 Current Model Router primarily filters eligibility and chooses the cheapest eligible model by output/input token price.
 
 MVP must evolve selection toward:
+
 - required quality
 - reasoning complexity
 - action risk
@@ -172,7 +175,9 @@ MVP must evolve selection toward:
 Do not use an LLM to make every routing decision. Deterministic policy is first; a cheap classifier is allowed only for genuinely ambiguous classification.
 
 ### GAP B — Durable AI economics ledger
+
 The current `UsageLedger` is an in-memory primitive. MVP needs persistent records with at least:
+
 - organization / tenant
 - user
 - project/client when known
@@ -195,6 +200,7 @@ The current `UsageLedger` is an in-memory primitive. MVP needs persistent record
 - success/failure
 
 Token provenance values:
+
 - `PROVIDER_REPORTED`
 - `TOKENIZER_CALCULATED`
 - `HEURISTIC_ESTIMATE`
@@ -202,7 +208,9 @@ Token provenance values:
 - `UNKNOWN`
 
 ### GAP C — Baseline mode
+
 Before optimization claims, capture a baseline window. Compare baseline vs optimized:
+
 - cost per successful task
 - first-pass acceptance
 - model/API spend
@@ -215,7 +223,9 @@ Before optimization claims, capture a baseline window. Compare baseline vs optim
 No invented savings percentages.
 
 ### GAP D — Router Decision Receipt
+
 Every routed request needs an auditable decision record:
+
 - task class
 - complexity
 - risk
@@ -230,9 +240,11 @@ Every routed request needs an auditable decision record:
 - user acceptance signal
 
 ### GAP E — Router Auditor
+
 MVP needs an evaluator that audits a **sample** of routing decisions. It must not second-guess every production request with another expensive model.
 
 Score:
+
 1. quality
 2. cost efficiency
 3. escalation accuracy
@@ -240,13 +252,16 @@ Score:
 5. deterministic/cache opportunity
 
 Track both:
+
 - **under-routing** — selected model cannot meet quality threshold
 - **over-routing** — expensive model used when cheaper route passes
 
 The auditor itself has a budget.
 
 ### GAP F — Golden Test Suite
+
 Create 100–250 representative real tasks across:
+
 - deterministic PM/status
 - extraction/classification
 - summarization
@@ -264,7 +279,9 @@ Create 100–250 representative real tasks across:
 Each case defines expected execution class, minimum quality, risk, and allowed routes.
 
 ### GAP G — Caching is layered, not one feature
+
 MVP distinguishes:
+
 1. application/result cache
 2. provider-native prompt cache
 3. local inference prefix/KV cache
@@ -272,7 +289,9 @@ MVP distinguishes:
 Stable context precedes dynamic context. Cache keys must be tenant-isolated. Do not introduce semantic answer reuse in MVP.
 
 ### GAP H — Privacy-aware routing
+
 Add explicit data classes:
+
 - PUBLIC
 - INTERNAL
 - CONFIDENTIAL
@@ -281,9 +300,11 @@ Add explicit data classes:
 Provider/model eligibility is policy-controlled by class and tenant. Sensitive data does not automatically leave approved infrastructure.
 
 ### GAP I — Local worker registry
+
 A local desktop cannot be assumed online.
 
 Track:
+
 - worker ID
 - health
 - GPU/VRAM
@@ -297,6 +318,7 @@ Track:
 Offline/degraded workers are removed from eligible routes automatically.
 
 ### GAP J — Cost accounting must include failure
+
 Optimize **cost per accepted result**, including retries, corrections, escalations, failed tool calls, and shadow-test expense.
 
 ## 6. MVP requirements — frozen
@@ -361,6 +383,7 @@ MVP includes:
 A route is eligible only if it satisfies hard policy constraints.
 
 Among eligible routes, optimize expected total value using:
+
 - minimum quality threshold
 - predicted acceptance probability
 - expected total cost
@@ -376,20 +399,25 @@ A cheap model/classifier may assist with ambiguous task classification but does 
 ## 9. Evaluation rules
 
 ### Production
+
 One selected route returns the user-visible result.
 
 ### Shadow
+
 A bounded sample of eligible traffic may run alternate routes. Shadow outputs are not shown to users and cannot perform side effects.
 
 ### Judge
+
 Prefer deterministic validators for deterministic criteria. For subjective criteria, use a rubric and, when justified, a different model/provider.
 
 ### Auditor budget
+
 Shadow/evaluation spend is tracked separately. Optimization is a failure if evaluation cost exceeds the value it creates.
 
 ## 10. Quality signals
 
 Capture passive signals where available:
+
 - accepted
 - regenerated
 - substantially edited
@@ -404,6 +432,7 @@ Explicit feedback may supplement passive signals.
 ## 11. MVP dashboard
 
 Minimum views:
+
 - requests
 - tokens in
 - cached input
@@ -493,6 +522,7 @@ Minimum views:
 ## 13. Hardware information still required
 
 Before selecting the first desktop local model, record:
+
 - desktop GPU exact model
 - desktop VRAM
 - desktop system RAM
@@ -507,6 +537,7 @@ Do not block AI-0 or AI-1 on this inventory.
 ## 14. Acceptance definition for MVP
 
 MVP is complete when:
+
 - normal deterministic work can bypass models;
 - local compute can serve eligible requests and disappear without outage;
 - frontier APIs are escalation tiers;
