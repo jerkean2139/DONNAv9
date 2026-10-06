@@ -251,9 +251,13 @@ export function routeModel(
   if (primary === undefined) return null;
   if (input.strictQuality === true && !primary.meetsQualityFloor) return null;
 
-  const reason = `${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
+  const policyReason =
+    input.routePolicyVersion === 'baseline-v1'
+      ? 'Baseline cheap-first policy.'
+      : 'Maximum Logic quality/risk/economics policy.';
+  const reason = `${policyReason} ${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
     3,
-  )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result $${primary.expectedCostPerAcceptedResultUsd.toFixed(
+  )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result ${primary.expectedCostPerAcceptedResultUsd.toFixed(
     6,
   )}.`;
 
