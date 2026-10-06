@@ -72,19 +72,13 @@ describe('routeModel', () => {
   });
 
   it('forces RESTRICTED data to local inference', () => {
-    const d = routeModel(
-      { reasoningTier: 2, dataClassification: 'RESTRICTED' },
-      registry,
-    );
+    const d = routeModel({ reasoningTier: 2, dataClassification: 'RESTRICTED' }, registry);
     expect(d?.model.id).toBe('local');
     expect(d?.model.privacy).toBe('local');
   });
 
   it('prefers local for CONFIDENTIAL data when local quality is sufficient', () => {
-    const d = routeModel(
-      { reasoningTier: 2, dataClassification: 'CONFIDENTIAL' },
-      registry,
-    );
+    const d = routeModel({ reasoningTier: 2, dataClassification: 'CONFIDENTIAL' }, registry);
     expect(d?.model.id).toBe('local');
   });
 

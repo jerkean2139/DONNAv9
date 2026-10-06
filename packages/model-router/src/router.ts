@@ -119,8 +119,7 @@ function isEligible(model: ModelEntry, input: ModelRoutingInput): boolean {
   if (input.needsTools === true && !model.capabilities.tools) return false;
   if (input.needsVision === true && !model.capabilities.vision) return false;
 
-  const localRequired =
-    input.requireLocal === true || input.dataClassification === 'RESTRICTED';
+  const localRequired = input.requireLocal === true || input.dataClassification === 'RESTRICTED';
   if (localRequired && model.privacy !== 'local') return false;
 
   if (model.contextTokens < (input.minContextTokens ?? 0)) return false;
@@ -180,8 +179,7 @@ function compareCandidates(
     if (b.health === 'healthy') return 1;
   }
 
-  const cpaDiff =
-    a.expectedCostPerAcceptedResultUsd - b.expectedCostPerAcceptedResultUsd;
+  const cpaDiff = a.expectedCostPerAcceptedResultUsd - b.expectedCostPerAcceptedResultUsd;
   if (cpaDiff !== 0) return cpaDiff;
 
   const aLatency = a.expectedLatencyMs ?? Number.POSITIVE_INFINITY;
@@ -224,7 +222,8 @@ export function routeModel(
 
   if (covering.length === 0) {
     candidateModels = eligible;
-    expansionReason = 'No model tier directly covers the request; using capable overqualified models.';
+    expansionReason =
+      'No model tier directly covers the request; using capable overqualified models.';
   } else if (coveringMeetsFloor) {
     candidateModels = covering;
     expansionReason = 'At least one tier-covering model meets the quality floor.';
@@ -242,12 +241,11 @@ export function routeModel(
   if (primary === undefined) return null;
   if (input.strictQuality === true && !primary.meetsQualityFloor) return null;
 
-  const reason =
-    `${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
-      3,
-    )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result $${primary.expectedCostPerAcceptedResultUsd.toFixed(
-      6,
-    )}.`;
+  const reason = `${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
+    3,
+  )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result $${primary.expectedCostPerAcceptedResultUsd.toFixed(
+    6,
+  )}.`;
 
   return {
     model: primary.model,
