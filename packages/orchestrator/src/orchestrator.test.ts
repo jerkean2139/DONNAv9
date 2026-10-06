@@ -145,12 +145,17 @@ describe('executeWorkOrder — AI path', () => {
     expect(events).toContain('task.completed');
   });
 
-  it('records a routing decision receipt with privacy and policy attribution', async () => {
+  it('records and finalizes a routing decision receipt with privacy and policy attribution', async () => {
     const receipts: import('./work-order.js').RoutingDecisionRecord[] = [];
+    const outcomes: import('./work-order.js').RoutingDecisionOutcome[] = [];
     const { deps } = makeDeps({
       routingDecisions: {
         record: (entry) => {
           receipts.push(entry);
+          return 'receipt-1';
+        },
+        complete: (_receiptId, outcome) => {
+          outcomes.push(outcome);
         },
       },
     });
@@ -178,6 +183,13 @@ describe('executeWorkOrder — AI path', () => {
       fallbackDepth: 0,
     });
     expect(receipts[0]?.candidates).toEqual(['claude-sonnet-5']);
+    expect(outcomes).toEqual([
+      {
+        outcome: 'completed',
+        selectedModelId: 'claude-sonnet-5',
+        fallbackDepth: 0,
+      },
+    ]);
   });
 
   it('fails when the AI order carries no model request', async () => {
@@ -207,7 +219,7 @@ describe('executeWorkOrder — AI path', () => {
     expect(result.status).toBe('budget_exceeded');
   });
 
-  it('falls back to the next model on a retryable error', async () => {
+  it('falls back to the next model on a retryable error and records actual fallback depth', async () => {
     const twoModels: ModelEntry[] = [
       { ...cloudModel, id: 'a', outputCostPer1M: 5, tierRange: [3, 7] },
       { ...cloudModel, id: 'b', outputCostPer1M: 10, tierRange: [3, 7] },
@@ -217,13 +229,28 @@ describe('executeWorkOrder — AI path', () => {
       () => 'rate_limit',
     );
     const good = fakeModelAdapter((i) => Promise.resolve(okResult(`ok:${i.messages.length}`)));
-    const { deps } = makeDeps({
+    const outcomes: import('./work-order.js').RoutingDecisionOutcome[] = [];
+    const { deps, ledger } = makeDeps({
       modelRegistry: twoModels,
       resolveModelAdapter: (id) => (id === 'a' ? bad : good),
+      routingDecisions: {
+        record: () => 'receipt-fallback',
+        complete: (_receiptId, outcome) => {
+          outcomes.push(outcome);
+        },
+      },
     });
     const result = await executeWorkOrder(aiOrder, deps);
     expect(result.status).toBe('completed');
     expect(result.modelId).toBe('b');
+    expect(outcomes).toEqual([
+      {
+        outcome: 'completed',
+        selectedModelId: 'b',
+        fallbackDepth: 1,
+      },
+    ]);
+    expect(ledger.all()[0]?.fallbackDepth).toBe(1);
   });
 
   it('does not fall back on a deterministic error', async () => {
