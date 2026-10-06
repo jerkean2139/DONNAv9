@@ -200,6 +200,20 @@ export async function executeWorkOrder(
       ...(order.needsVision !== undefined ? { needsVision: order.needsVision } : {}),
       ...(order.requireLocal !== undefined ? { requireLocal: order.requireLocal } : {}),
       ...(order.minContextTokens !== undefined ? { minContextTokens: order.minContextTokens } : {}),
+      ...(order.riskLevel !== undefined ? { riskLevel: order.riskLevel } : {}),
+      ...(order.minQuality !== undefined ? { minQuality: order.minQuality } : {}),
+      ...(order.expectedInputTokens !== undefined
+        ? { expectedInputTokens: order.expectedInputTokens }
+        : {}),
+      ...(order.expectedOutputTokens !== undefined
+        ? { expectedOutputTokens: order.expectedOutputTokens }
+        : {}),
+      ...(order.maxLatencyMs !== undefined ? { maxLatencyMs: order.maxLatencyMs } : {}),
+      ...(order.strictQuality !== undefined ? { strictQuality: order.strictQuality } : {}),
+      ...(order.modelRuntimeSignals !== undefined
+        ? { runtimeSignals: order.modelRuntimeSignals }
+        : {}),
+      dataClassification,
     },
     deps.modelRegistry,
   );
@@ -221,10 +235,26 @@ export async function executeWorkOrder(
     routePolicyVersion,
     reasoningTier: order.reasoningTier ?? 5,
     dataClassification,
-    candidates: chain.map((entry) => entry.id),
+    candidates: decision.candidates.map((candidate) => ({
+      modelId: candidate.model.id,
+      predictedQuality: candidate.predictedQuality,
+      requiredQuality: candidate.requiredQuality,
+      meetsQualityFloor: candidate.meetsQualityFloor,
+      expectedCostUsd: candidate.expectedCostUsd,
+      expectedCostPerAcceptedResultUsd: candidate.expectedCostPerAcceptedResultUsd,
+      ...(candidate.expectedLatencyMs !== undefined
+        ? { expectedLatencyMs: candidate.expectedLatencyMs }
+        : {}),
+      health: candidate.health,
+    })),
     selectedRoute: executionClass,
     selectedModelId: decision.model.id,
     reason: decision.reason,
+    expectedCostUsd: decision.candidates[0]?.expectedCostUsd,
+    expectedQuality: decision.candidates[0]?.predictedQuality,
+    ...(decision.candidates[0]?.expectedLatencyMs !== undefined
+      ? { expectedLatencyMs: decision.candidates[0].expectedLatencyMs }
+      : {}),
     fallbackDepth: 0,
   });
 
