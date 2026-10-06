@@ -130,7 +130,7 @@ export async function executeWorkOrder(
           outputTokens: 0,
           costUsd: usage?.costUsd ?? 0,
           latencyMs: usage?.latencyMs ?? 0,
-          routePolicyVersion,
+          routePolicyVersion: order.routePolicyVersion ?? 'baseline-v1',
           tokenProvenance: 'UNKNOWN',
           ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
         });
