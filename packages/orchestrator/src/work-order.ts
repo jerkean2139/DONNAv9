@@ -104,6 +104,13 @@ export interface RoutingDecisionRecord {
   readonly fallbackDepth: number;
 }
 
+export interface RoutingDecisionOutcome {
+  readonly outcome: string;
+  readonly selectedModelId?: string;
+  readonly fallbackDepth: number;
+}
+
 export interface RoutingDecisionRecorder {
-  record(entry: RoutingDecisionRecord): void | Promise<void>;
+  record(entry: RoutingDecisionRecord): string | undefined | Promise<string | undefined>;
+  complete?(receiptId: string, outcome: RoutingDecisionOutcome): void | Promise<void>;
 }
