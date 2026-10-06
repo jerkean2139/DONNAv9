@@ -22,6 +22,8 @@ export interface ModelRuntimeSignals {
  * health and latency are explicit inputs. No LLM is used to choose another LLM.
  */
 export interface ModelRoutingInput {
+  /** Versioned scoring policy. baseline-v1 preserves pre-AI-1 cheap-first behavior. */
+  readonly routePolicyVersion?: 'baseline-v1' | 'maximum-logic-v1';
   /** 0-10 reasoning tier from the task (Technical Plan §10). */
   readonly reasoningTier: number;
   /** 0-10 independent execution risk. Higher risk raises the quality floor. */
@@ -235,7 +237,15 @@ export function routeModel(
 
   const ranked = candidateModels
     .map((model) => scoreCandidate(model, input))
-    .sort((a, b) => compareCandidates(a, b, input));
+    .sort((a, b) => {
+      if (input.routePolicyVersion === 'baseline-v1') {
+        return (
+          a.model.outputCostPer1M - b.model.outputCostPer1M ||
+          a.model.inputCostPer1M - b.model.inputCostPer1M
+        );
+      }
+      return compareCandidates(a, b, input);
+    });
 
   const primary = ranked[0];
   if (primary === undefined) return null;
