@@ -16,6 +16,7 @@ import { DrizzleOutboxStore } from './outbox-store.js';
 import { BufferingEventBus, TaskStateStore } from './task-state.js';
 import { parseWorkOrder } from './work-order-payload.js';
 import { DrizzleUsageRecorder } from './usage-recorder.js';
+import { DrizzleRoutingDecisionRecorder } from './routing-decision-recorder.js';
 import {
   ProjectManagerReconciler,
   PROJECT_MANAGER_RECONCILIATION_TASK,
@@ -95,6 +96,7 @@ export async function runWorker(config: WorkerConfig): Promise<Runner> {
     workRegistry: catalog?.toWorkRegistry() ?? config.workRegistry ?? new CapabilityRegistry(),
     modelRegistry: MODEL_REGISTRY,
     ledger: new DrizzleUsageRecorder(db),
+    routingDecisions: new DrizzleRoutingDecisionRecorder(db),
     resolveModelAdapter: createModelAdapterResolver(MODEL_REGISTRY),
     ...(catalog !== undefined ? { resolveCapabilityAdapter: catalog.resolver() } : {}),
   };
