@@ -111,6 +111,39 @@ describe('routeModel', () => {
     expect(d?.model.id).toBe('mid');
   });
 
+  it('preserves cheap-first selection under baseline-v1', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        routePolicyVersion: 'baseline-v1',
+        runtimeSignals: {
+          cheap: { acceptanceRate: 0.71 },
+          mid: { acceptanceRate: 0.99 },
+        },
+      },
+      registry,
+    );
+    expect(d?.model.id).toBe('cheap');
+    expect(d?.reason).toContain('Baseline cheap-first policy');
+  });
+
+  it('uses Maximum Logic scoring when maximum-logic-v1 is selected', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        routePolicyVersion: 'maximum-logic-v1',
+        minQuality: 0.95,
+        runtimeSignals: {
+          cheap: { acceptanceRate: 0.8 },
+          mid: { acceptanceRate: 0.98 },
+        },
+      },
+      registry,
+    );
+    expect(d?.model.id).toBe('mid');
+    expect(d?.reason).toContain('Maximum Logic quality/risk/economics policy');
+  });
+
   it('uses empirical acceptance rate for expected cost per accepted result', () => {
     const d = routeModel(
       {
