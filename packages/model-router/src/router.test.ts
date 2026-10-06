@@ -64,6 +64,108 @@ describe('routeModel', () => {
     expect(d?.fallbacks.map((m) => m.id)).toContain('dear');
   });
 
+  it('raises the quality floor for high-risk work and chooses the stronger covering model', () => {
+    const d = routeModel({ reasoningTier: 4, riskLevel: 10 }, registry);
+    expect(d?.model.id).toBe('mid');
+    expect(d?.candidates[0]?.meetsQualityFloor).toBe(true);
+    expect(d?.candidates[0]?.requiredQuality).toBeCloseTo(0.9);
+  });
+
+  it('forces RESTRICTED data to local inference', () => {
+    const d = routeModel(
+      { reasoningTier: 2, dataClassification: 'RESTRICTED' },
+      registry,
+    );
+    expect(d?.model.id).toBe('local');
+    expect(d?.model.privacy).toBe('local');
+  });
+
+  it('prefers local for CONFIDENTIAL data when local quality is sufficient', () => {
+    const d = routeModel(
+      { reasoningTier: 2, dataClassification: 'CONFIDENTIAL' },
+      registry,
+    );
+    expect(d?.model.id).toBe('local');
+  });
+
+  it('excludes unhealthy runtime models', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        runtimeSignals: {
+          cheap: { health: 'unhealthy' },
+        },
+      },
+      registry,
+    );
+    expect(d?.model.id).toBe('mid');
+    expect(d?.candidates.map((candidate) => candidate.model.id)).not.toContain('cheap');
+  });
+
+  it('respects a hard latency ceiling when latency is known', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        maxLatencyMs: 1000,
+        runtimeSignals: {
+          cheap: { expectedLatencyMs: 5000 },
+          mid: { expectedLatencyMs: 800 },
+        },
+      },
+      registry,
+    );
+    expect(d?.model.id).toBe('mid');
+  });
+
+  it('uses empirical acceptance rate for expected cost per accepted result', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        runtimeSignals: {
+          cheap: { acceptanceRate: 0.71 },
+          mid: { acceptanceRate: 0.98 },
+        },
+      },
+      registry,
+    );
+
+    expect(d?.model.id).toBe('cheap');
+    expect(d?.candidates[0]?.predictedQuality).toBeCloseTo(0.71);
+    expect(d?.candidates[0]?.expectedCostPerAcceptedResultUsd).toBeGreaterThan(0);
+  });
+
+  it('expands to an overqualified model when covering models miss the quality floor', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 4,
+        minQuality: 0.94,
+        runtimeSignals: {
+          cheap: { acceptanceRate: 0.7 },
+          mid: { acceptanceRate: 0.8 },
+          dear: { acceptanceRate: 0.97 },
+        },
+      },
+      registry,
+    );
+    expect(d?.model.id).toBe('dear');
+    expect(d?.reason).toContain('expanded to all capable models');
+  });
+
+  it('fails closed when strict quality is requested and nobody reaches the floor', () => {
+    const d = routeModel(
+      {
+        reasoningTier: 8,
+        minQuality: 0.99,
+        strictQuality: true,
+        runtimeSignals: {
+          dear: { acceptanceRate: 0.8 },
+        },
+      },
+      registry,
+    );
+    expect(d).toBeNull();
+  });
+
   it('returns null when nothing is eligible', () => {
     expect(routeModel({ reasoningTier: 2, minContextTokens: 10_000_000 }, registry)).toBeNull();
   });
