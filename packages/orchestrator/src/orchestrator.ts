@@ -214,7 +214,7 @@ export async function executeWorkOrder(
 
   const chain: readonly ModelEntry[] = [decision.model, ...decision.fallbacks];
 
-  await deps.routingDecisions?.record({
+  const routingReceiptId = await deps.routingDecisions?.record({
     organizationId: order.organizationId,
     ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
     ...(order.correlationId !== undefined ? { correlationId: order.correlationId } : {}),
@@ -227,16 +227,37 @@ export async function executeWorkOrder(
     reason: decision.reason,
     fallbackDepth: 0,
   });
-  let lastErrorClass: string | undefined;
 
-  for (const entry of chain) {
+  const completeRoutingReceipt = async (
+    outcome: string,
+    selectedModelId: string | undefined,
+    fallbackDepth: number,
+  ): Promise<void> => {
+    if (routingReceiptId === undefined || deps.routingDecisions?.complete === undefined) return;
+    await deps.routingDecisions.complete(routingReceiptId, {
+      outcome,
+      ...(selectedModelId !== undefined ? { selectedModelId } : {}),
+      fallbackDepth,
+    });
+  };
+
+  let lastErrorClass: string | undefined;
+  let lastAttemptedModelId: string | undefined;
+  let lastFallbackDepth = 0;
+
+  for (let fallbackDepth = 0; fallbackDepth < chain.length; fallbackDepth += 1) {
+    const entry = chain[fallbackDepth]!;
     const adapter = deps.resolveModelAdapter(entry.id);
     if (adapter === undefined) continue;
+
+    lastAttemptedModelId = entry.id;
+    lastFallbackDepth = fallbackDepth;
 
     if (order.budget !== undefined) {
       const est = await adapter.estimate(modelRequest, {});
       const check = checkBudget(order.budget.budget, order.budget.spentUsd, est.costUsd);
       if (!check.allowed) {
+        await completeRoutingReceipt('budget_exceeded', entry.id, fallbackDepth);
         await emit('task.blocked');
         return {
           status: 'budget_exceeded',
@@ -260,6 +281,7 @@ export async function executeWorkOrder(
         latencyMs: result.usage.latencyMs,
         routePolicyVersion,
         tokenProvenance: 'PROVIDER_REPORTED',
+        fallbackDepth,
         ...(result.usage.reasoningTokens !== undefined
           ? { reasoningTokens: result.usage.reasoningTokens }
           : {}),
@@ -268,6 +290,7 @@ export async function executeWorkOrder(
           : {}),
         ...(order.taskId !== undefined ? { taskId: order.taskId } : {}),
       });
+      await completeRoutingReceipt('completed', entry.id, fallbackDepth);
       await emit('task.completed');
       return {
         status: 'completed',
@@ -282,10 +305,12 @@ export async function executeWorkOrder(
     }
   }
 
+  const failureReason = lastErrorClass === undefined ? 'no_adapter' : 'adapter_error';
+  await completeRoutingReceipt(failureReason, lastAttemptedModelId, lastFallbackDepth);
   await emit('task.failed');
   return {
     status: 'failed',
     executionClass,
-    reason: lastErrorClass === undefined ? 'no_adapter' : 'adapter_error',
+    reason: failureReason,
   };
 }
