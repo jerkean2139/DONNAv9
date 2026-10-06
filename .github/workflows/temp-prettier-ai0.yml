@@ -1,0 +1,38 @@
+name: Temporary exact Prettier AI-0
+
+on:
+  push:
+    branches:
+      - feat/ai-0-routing-decision-receipts
+
+permissions:
+  contents: write
+
+jobs:
+  format-ai0:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ai-0-routing-decision-receipts
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format changed AI-0 files
+        run: pnpm exec prettier packages/orchestrator/src/orchestrator.ts packages/orchestrator/src/orchestrator.test.ts packages/orchestrator/src/work-order.ts apps/worker/src/routing-decision-recorder.ts apps/worker/src/worker.ts --write
+      - name: Verify formatting
+        run: pnpm exec prettier packages/orchestrator/src/orchestrator.ts packages/orchestrator/src/orchestrator.test.ts packages/orchestrator/src/work-order.ts apps/worker/src/routing-decision-recorder.ts apps/worker/src/worker.ts --check
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/orchestrator/src/orchestrator.ts packages/orchestrator/src/orchestrator.test.ts packages/orchestrator/src/work-order.ts apps/worker/src/routing-decision-recorder.ts apps/worker/src/worker.ts
+          git commit -m "fix: apply exact Prettier output to AI-0 receipt slice"
+          git push
