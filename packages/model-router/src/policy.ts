@@ -1,9 +1,7 @@
 export const BASELINE_ROUTE_POLICY = 'baseline-v1' as const;
 export const MAXIMUM_LOGIC_ROUTE_POLICY = 'maximum-logic-v1' as const;
 
-export type RoutePolicyVersion =
-  | typeof BASELINE_ROUTE_POLICY
-  | typeof MAXIMUM_LOGIC_ROUTE_POLICY;
+export type RoutePolicyVersion = typeof BASELINE_ROUTE_POLICY | typeof MAXIMUM_LOGIC_ROUTE_POLICY;
 
 export interface RoutePolicySelectionInput {
   readonly organizationId: string;
@@ -35,11 +33,7 @@ export function selectRoutePolicy(input: RoutePolicySelectionInput): RoutePolicy
   if (percent === 0) return BASELINE_ROUTE_POLICY;
   if (percent === 100) return MAXIMUM_LOGIC_ROUTE_POLICY;
 
-  const identity = [
-    input.organizationId,
-    input.taskId ?? '',
-    input.correlationId ?? '',
-  ].join(':');
+  const identity = [input.organizationId, input.taskId ?? '', input.correlationId ?? ''].join(':');
   const bucket = stableHash(identity) % 100;
 
   return bucket < percent ? MAXIMUM_LOGIC_ROUTE_POLICY : BASELINE_ROUTE_POLICY;

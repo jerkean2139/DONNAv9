@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  BASELINE_ROUTE_POLICY,
-  MAXIMUM_LOGIC_ROUTE_POLICY,
-  selectRoutePolicy,
-} from './policy.js';
+import { BASELINE_ROUTE_POLICY, MAXIMUM_LOGIC_ROUTE_POLICY, selectRoutePolicy } from './policy.js';
 
 describe('selectRoutePolicy', () => {
   it('keeps a 0% canary on baseline', () => {
@@ -41,11 +37,11 @@ describe('selectRoutePolicy', () => {
   });
 
   it('clamps rollout percentages safely', () => {
-    expect(
-      selectRoutePolicy({ organizationId: 'org1', maximumLogicPercent: -50 }),
-    ).toBe(BASELINE_ROUTE_POLICY);
-    expect(
-      selectRoutePolicy({ organizationId: 'org1', maximumLogicPercent: 500 }),
-    ).toBe(MAXIMUM_LOGIC_ROUTE_POLICY);
+    expect(selectRoutePolicy({ organizationId: 'org1', maximumLogicPercent: -50 })).toBe(
+      BASELINE_ROUTE_POLICY,
+    );
+    expect(selectRoutePolicy({ organizationId: 'org1', maximumLogicPercent: 500 })).toBe(
+      MAXIMUM_LOGIC_ROUTE_POLICY,
+    );
   });
 });
