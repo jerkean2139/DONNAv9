@@ -250,8 +250,12 @@ export async function executeWorkOrder(
     selectedRoute: executionClass,
     selectedModelId: decision.model.id,
     reason: decision.reason,
-    expectedCostUsd: decision.candidates[0]?.expectedCostUsd,
-    expectedQuality: decision.candidates[0]?.predictedQuality,
+    ...(decision.candidates[0] !== undefined
+      ? {
+          expectedCostUsd: decision.candidates[0].expectedCostUsd,
+          expectedQuality: decision.candidates[0].predictedQuality,
+        }
+      : {}),
     ...(decision.candidates[0]?.expectedLatencyMs !== undefined
       ? { expectedLatencyMs: decision.candidates[0].expectedLatencyMs }
       : {}),
