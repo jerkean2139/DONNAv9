@@ -164,7 +164,19 @@ describe('executeWorkOrder — AI path', () => {
         ...aiOrder,
         correlationId: '11111111-1111-4111-8111-111111111111',
         dataClassification: 'CONFIDENTIAL',
-        routePolicyVersion: 'baseline-test-v1',
+        routePolicyVersion: 'maximum-logic-v1',
+        riskLevel: 8,
+        minQuality: 0.8,
+        expectedInputTokens: 2_000,
+        expectedOutputTokens: 800,
+        maxLatencyMs: 2_000,
+        modelRuntimeSignals: {
+          'claude-sonnet-5': {
+            acceptanceRate: 0.96,
+            expectedLatencyMs: 900,
+            health: 'healthy',
+          },
+        },
       },
       deps,
     );
@@ -175,14 +187,24 @@ describe('executeWorkOrder — AI path', () => {
       organizationId: 'org1',
       taskId: 'task1',
       correlationId: '11111111-1111-4111-8111-111111111111',
-      routePolicyVersion: 'baseline-test-v1',
+      routePolicyVersion: 'maximum-logic-v1',
       reasoningTier: 5,
       dataClassification: 'CONFIDENTIAL',
       selectedRoute: 'cloud_ai',
       selectedModelId: 'claude-sonnet-5',
       fallbackDepth: 0,
     });
-    expect(receipts[0]?.candidates).toEqual(['claude-sonnet-5']);
+    expect(receipts[0]?.expectedQuality).toBeCloseTo(0.96);
+    expect(receipts[0]?.expectedLatencyMs).toBe(900);
+    expect(receipts[0]?.expectedCostUsd).toBeGreaterThan(0);
+    expect(receipts[0]?.candidates).toHaveLength(1);
+    expect(receipts[0]?.candidates[0]).toMatchObject({
+      modelId: 'claude-sonnet-5',
+      predictedQuality: 0.96,
+      meetsQualityFloor: true,
+      expectedLatencyMs: 900,
+      health: 'healthy',
+    });
     expect(outcomes).toEqual([
       {
         outcome: 'completed',

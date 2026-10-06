@@ -27,6 +27,29 @@ export interface WorkOrder {
   readonly needsVision?: boolean;
   readonly requireLocal?: boolean;
   readonly minContextTokens?: number;
+  /** Independent execution risk, 0-10. */
+  readonly riskLevel?: number;
+  /** Explicit minimum predicted first-pass quality/acceptance, 0..1. */
+  readonly minQuality?: number;
+  /** Expected request size used for route economics before provider execution. */
+  readonly expectedInputTokens?: number;
+  readonly expectedOutputTokens?: number;
+  /** Hard end-to-end latency ceiling when runtime latency telemetry exists. */
+  readonly maxLatencyMs?: number;
+  /** Fail closed when no eligible model reaches the quality floor. */
+  readonly strictQuality?: boolean;
+  /** Runtime health/quality/latency telemetry keyed by model id. */
+  readonly modelRuntimeSignals?: Readonly<
+    Record<
+      string,
+      {
+        readonly acceptanceRate?: number;
+        readonly qualityScore?: number;
+        readonly expectedLatencyMs?: number;
+        readonly health?: 'healthy' | 'degraded' | 'unhealthy';
+      }
+    >
+  >;
   readonly modelRequest?: ModelRequest;
   /** Hard routing input. Defaults to INTERNAL when omitted. */
   readonly dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
@@ -97,10 +120,22 @@ export interface RoutingDecisionRecord {
   readonly routePolicyVersion: string;
   readonly reasoningTier: number;
   readonly dataClassification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
-  readonly candidates: readonly string[];
+  readonly candidates: readonly {
+    readonly modelId: string;
+    readonly predictedQuality: number;
+    readonly requiredQuality: number;
+    readonly meetsQualityFloor: boolean;
+    readonly expectedCostUsd: number;
+    readonly expectedCostPerAcceptedResultUsd: number;
+    readonly expectedLatencyMs?: number;
+    readonly health: 'healthy' | 'degraded' | 'unhealthy';
+  }[];
   readonly selectedRoute: string;
   readonly selectedModelId?: string;
   readonly reason: string;
+  readonly expectedCostUsd?: number;
+  readonly expectedQuality?: number;
+  readonly expectedLatencyMs?: number;
   readonly fallbackDepth: number;
 }
 

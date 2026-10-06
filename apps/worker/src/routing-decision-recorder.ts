@@ -25,6 +25,15 @@ export class DrizzleRoutingDecisionRecorder implements RoutingDecisionRecorder {
         selectedRoute: entry.selectedRoute,
         ...(entry.selectedModelId !== undefined ? { selectedModelId: entry.selectedModelId } : {}),
         reason: entry.reason,
+        ...(entry.expectedCostUsd !== undefined
+          ? { expectedCostUsd: String(entry.expectedCostUsd) }
+          : {}),
+        ...(entry.expectedQuality !== undefined
+          ? { expectedQuality: String(entry.expectedQuality) }
+          : {}),
+        ...(entry.expectedLatencyMs !== undefined
+          ? { expectedLatencyMs: entry.expectedLatencyMs }
+          : {}),
         fallbackDepth: entry.fallbackDepth,
       })
       .returning({ id: schema.aiRoutingDecisions.id });
