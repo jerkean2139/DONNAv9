@@ -90,7 +90,6 @@ export interface OrchestratorDeps {
   readonly resolveCapabilityAdapter?: (capabilityId: string) => CapabilityAdapter | undefined;
 }
 
-
 export interface RoutingDecisionRecord {
   readonly organizationId: string;
   readonly taskId?: string;

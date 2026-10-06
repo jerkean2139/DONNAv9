@@ -148,7 +148,11 @@ describe('executeWorkOrder — AI path', () => {
   it('records a routing decision receipt with privacy and policy attribution', async () => {
     const receipts: import('./work-order.js').RoutingDecisionRecord[] = [];
     const { deps } = makeDeps({
-      routingDecisions: { record: (entry) => { receipts.push(entry); } },
+      routingDecisions: {
+        record: (entry) => {
+          receipts.push(entry);
+        },
+      },
     });
     const result = await executeWorkOrder(
       {
