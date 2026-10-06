@@ -22,6 +22,8 @@ export interface ModelRuntimeSignals {
  * health and latency are explicit inputs. No LLM is used to choose another LLM.
  */
 export interface ModelRoutingInput {
+  /** Versioned scoring policy. baseline-v1 preserves pre-AI-1 cheap-first behavior. */
+  readonly routePolicyVersion?: 'baseline-v1' | 'maximum-logic-v1';
   /** 0-10 reasoning tier from the task (Technical Plan §10). */
   readonly reasoningTier: number;
   /** 0-10 independent execution risk. Higher risk raises the quality floor. */
@@ -235,15 +237,27 @@ export function routeModel(
 
   const ranked = candidateModels
     .map((model) => scoreCandidate(model, input))
-    .sort((a, b) => compareCandidates(a, b, input));
+    .sort((a, b) => {
+      if (input.routePolicyVersion === 'baseline-v1') {
+        return (
+          a.model.outputCostPer1M - b.model.outputCostPer1M ||
+          a.model.inputCostPer1M - b.model.inputCostPer1M
+        );
+      }
+      return compareCandidates(a, b, input);
+    });
 
   const primary = ranked[0];
   if (primary === undefined) return null;
   if (input.strictQuality === true && !primary.meetsQualityFloor) return null;
 
-  const reason = `${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
+  const policyReason =
+    input.routePolicyVersion === 'baseline-v1'
+      ? 'Baseline cheap-first policy.'
+      : 'Maximum Logic quality/risk/economics policy.';
+  const reason = `${policyReason} ${expansionReason} Selected ${primary.model.id}: predicted quality ${primary.predictedQuality.toFixed(
     3,
-  )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result $${primary.expectedCostPerAcceptedResultUsd.toFixed(
+  )} vs required ${primary.requiredQuality.toFixed(3)}, expected cost/accepted result ${primary.expectedCostPerAcceptedResultUsd.toFixed(
     6,
   )}.`;
 
