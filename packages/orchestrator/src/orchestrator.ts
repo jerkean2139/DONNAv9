@@ -195,6 +195,8 @@ export async function executeWorkOrder(
 
   const decision = routeModel(
     {
+      routePolicyVersion:
+        routePolicyVersion === 'maximum-logic-v1' ? 'maximum-logic-v1' : 'baseline-v1',
       reasoningTier: order.reasoningTier ?? 5,
       ...(order.needsTools !== undefined ? { needsTools: order.needsTools } : {}),
       ...(order.needsVision !== undefined ? { needsVision: order.needsVision } : {}),
